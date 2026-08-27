@@ -1,17 +1,18 @@
-# MetaGrid — Auto-Updating Dota 2 Hero Grid.
+# MetaGrid — Auto-Updating Dota 2 Hero Grid
+
+[![Latest Release](https://img.shields.io/github/v/release/darvels/metagrid?label=Latest%20Release)](https://github.com/darvels/metagrid/releases/latest)
+[![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-blue.svg)](LICENSE)
+![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6)
+
 ## 📥 Download MetaGrid
 
-### Latest version: v0.1.0
-
-**[⬇️ Download MetaGrid for Windows x64](https://github.com/darvels/metagrid/releases/latest)**
+### [⬇️ Download MetaGrid for Windows x64](https://github.com/darvels/metagrid/releases/latest)
 
 Download the latest release, extract the ZIP archive, and run `MetaGrid.exe`.
 
 > Windows 10/11 x64 · No separate .NET installation required
-Auto-updating Dota 2 hero grid powered by Dota2ProTracker High Winrate data.
 
 MetaGrid is a free Windows utility that retrieves the official Dota2ProTracker High Winrate hero grid, compares it with the currently managed Dota 2 hero grid for the selected Steam account, and safely installs updates when a real change exists.
-
 ## Features
 
 - Official Dota2ProTracker High Winrate grid retrieval
