@@ -1,0 +1,35 @@
+# Build output
+**/bin/
+**/obj/
+Release/
+artifacts/
+
+# IDE and tooling
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Test output
+TestResults/
+coverage/
+coverage.*
+
+# Local runtime and probe data
+.appdata/
+.dotnet-home/
+.nuget/
+tmp/
+tools/
+logs/
+*.log
+*.pdb
+*.har
+
+# Root-level local verification screenshots and logs
+/accounts-status-pass.png
+/dashboard-*.png
+/onboarding-*.png
+/continue-*.png
+/check-updates-*.png
+/run-*.log

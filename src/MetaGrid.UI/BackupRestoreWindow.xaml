@@ -1,0 +1,183 @@
+<Window x:Class="MetaGrid.UI.BackupRestoreWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Restore Backup"
+        Width="760"
+        Height="680"
+        MinWidth="640"
+        MinHeight="520"
+        ResizeMode="CanResize"
+        Style="{StaticResource DialogWindowStyle}">
+  <Border Style="{StaticResource PanelBorderStyle}" Margin="18">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <StackPanel Margin="0,0,0,18">
+        <TextBlock Text="Restore Hero Grid Backup" Style="{StaticResource PageTitleTextStyle}" FontSize="24" />
+        <TextBlock Text="Choose a backup to restore over the current MetaGrid-managed Dota hero grid. This action replaces the current configuration for the selected account." Margin="0,10,0,0" Foreground="{StaticResource SecondaryBrush}" TextWrapping="Wrap" />
+      </StackPanel>
+
+      <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="18">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="12" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <TextBlock Text="Available Backups" Style="{StaticResource SectionTitleTextStyle}" />
+          <ListBox x:Name="BackupListBox"
+                   Grid.Row="2"
+                   BorderThickness="0"
+                   Background="Transparent"
+                   HorizontalContentAlignment="Stretch"
+                   ScrollViewer.VerticalScrollBarVisibility="Auto"
+                   ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemContainerStyle>
+              <Style TargetType="ListBoxItem">
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Margin" Value="0,0,0,10" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                  <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                      <Border x:Name="ItemHost"
+                              Background="Transparent"
+                              BorderBrush="Transparent"
+                              BorderThickness="0"
+                              CornerRadius="16"
+                              Padding="0">
+                        <ContentPresenter />
+                      </Border>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                          <Setter TargetName="ItemHost" Property="Background" Value="#1D232D" />
+                          <Setter TargetName="ItemHost" Property="BorderBrush" Value="#4A5E7A" />
+                          <Setter TargetName="ItemHost" Property="BorderThickness" Value="1" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="ItemHost" Property="Background" Value="#151A21" />
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Setter.Value>
+                </Setter>
+              </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Border Style="{StaticResource CardBorderStyle}" Padding="16" Margin="0">
+                  <Grid>
+                    <Grid.RowDefinitions>
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                      <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <StackPanel Grid.Column="0">
+                        <TextBlock Text="{Binding DisplayName}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding AccountId, StringFormat=Account: {0}}" Margin="0,8,0,0" Foreground="{StaticResource SecondaryBrush}" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2" Text="{Binding FileSizeText, StringFormat=Size: {0}}" Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Top" />
+                    </Grid>
+
+                    <Grid Grid.Row="1" Margin="0,12,0,0">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="Backup hash" Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Top" />
+                      <TextBlock Grid.Column="2"
+                                 Text="{Binding BackupHash}"
+                                 FontFamily="Consolas"
+                                 Foreground="{StaticResource SecondaryBrush}"
+                                 TextTrimming="CharacterEllipsis"
+                                 ToolTip="{Binding BackupHash}" />
+                    </Grid>
+
+                    <Grid Grid.Row="2" Margin="0,8,0,0">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="Original path" Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Top" />
+                      <TextBlock Grid.Column="2"
+                                 Text="{Binding OriginalPath}"
+                                 FontFamily="Consolas"
+                                 Foreground="{StaticResource SecondaryBrush}"
+                                 TextWrapping="Wrap"
+                                 TextTrimming="CharacterEllipsis"
+                                 ToolTip="{Binding OriginalPath}" />
+                    </Grid>
+
+                    <Grid Grid.Row="3" Margin="0,8,0,0">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="10" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="Backup file" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Top" />
+                      <TextBlock Grid.Column="2"
+                                 Text="{Binding FilePath}"
+                                 FontFamily="Consolas"
+                                 Foreground="{StaticResource MutedBrush}"
+                                 TextWrapping="Wrap"
+                                 TextTrimming="CharacterEllipsis"
+                                 ToolTip="{Binding FilePath}" />
+                    </Grid>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <TextBlock x:Name="EmptyStateTextBlock"
+                     Grid.Row="2"
+                     Visibility="Collapsed"
+                     Text="No backups are available yet for the currently selected account."
+                     Foreground="{StaticResource SecondaryBrush}"
+                     VerticalAlignment="Center"
+                     HorizontalAlignment="Center"
+                     TextWrapping="Wrap"
+                     TextAlignment="Center" />
+        </Grid>
+      </Border>
+
+      <Grid Grid.Row="2" Margin="0,18,0,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="16" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Grid.Column="0"
+                   Text="Backups are stored in MetaGrid app-data and are account-aware when the source path is known."
+                   Foreground="{StaticResource MutedBrush}"
+                   VerticalAlignment="Center"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,4" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button Content="Cancel" IsCancel="True" Margin="0,0,10,0" />
+          <Button x:Name="RestoreButton"
+                  Content="Restore Selected Backup"
+                  MinWidth="180"
+                  Style="{StaticResource PrimaryButtonStyle}"
+                  Click="RestoreSelectedBackupClick" />
+        </StackPanel>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

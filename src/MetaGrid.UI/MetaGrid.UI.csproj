@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>MetaGrid</AssemblyName>
+    <Product>MetaGrid</Product>
+    <AssemblyTitle>MetaGrid</AssemblyTitle>
+    <Description>Dota 2 Hero Grid Updater</Description>
+    <Company>Darvel &amp; Codex</Company>
+    <Authors>Darvel &amp; Codex</Authors>
+    <Version>0.1.0</Version>
+    <FileVersion>0.1.0.0</FileVersion>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <InformationalVersion>0.1.0</InformationalVersion>
+    <ApplicationIcon>Assets\metagrid.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3065.39" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MetaGrid.Core\MetaGrid.Core.csproj" />
+    <ProjectReference Include="..\MetaGrid.Infrastructure\MetaGrid.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\metagrid.ico" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,45 @@
+<Window x:Class="MetaGrid.UI.InstallConfirmationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Install MetaGrid Hero Grid?"
+        Width="560"
+        ResizeMode="NoResize"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Style="{StaticResource DialogWindowStyle}">
+  <Border Style="{StaticResource PanelBorderStyle}" Margin="18">
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="18" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="18" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <StackPanel>
+        <TextBlock x:Name="TitleTextBlock" Text="Install MetaGrid Hero Grid?" Style="{StaticResource PageTitleTextStyle}" FontSize="24" />
+        <TextBlock x:Name="PreflightTextBlock" Margin="0,10,0,0" Foreground="{StaticResource SecondaryBrush}" TextWrapping="Wrap" />
+      </StackPanel>
+
+      <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}">
+        <StackPanel>
+          <TextBlock x:Name="SummaryTextBlock" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock x:Name="DetailsTextBlock" Margin="0,12,0,0" Foreground="{StaticResource SecondaryBrush}" TextWrapping="Wrap" />
+          <TextBlock x:Name="BackupStateTextBlock" Margin="0,12,0,0" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+
+      <TextBlock Grid.Row="3"
+                 Text="MetaGrid will preserve unrelated custom Dota hero grids and only insert or replace the MetaGrid-managed grid for the selected account."
+                 Foreground="{StaticResource MutedBrush}"
+                 TextWrapping="Wrap" />
+
+      <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+        <Button Content="Cancel" IsCancel="True" Margin="0,0,10,0" />
+        <Button x:Name="ConfirmButton" Style="{StaticResource PrimaryButtonStyle}" Click="ConfirmClick" />
+      </StackPanel>
+    </Grid>
+  </Border>
+</Window>
