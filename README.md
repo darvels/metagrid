@@ -1,4 +1,4 @@
-# MetaGrid - Auto-Updating Hero Grid from Dota 2 Pro Tracker
+# MetaGrid — Auto-Updating Dota 2 Hero Grid.
 
 Auto-updating Dota 2 hero grid powered by Dota2ProTracker High Winrate data.
 
