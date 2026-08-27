@@ -13,6 +13,27 @@ Download the latest release, extract the ZIP archive, and run `MetaGrid.exe`.
 > Windows 10/11 x64 · No separate .NET installation required
 
 MetaGrid is a free Windows utility that retrieves the official Dota2ProTracker High Winrate hero grid, compares it with the currently managed Dota 2 hero grid for the selected Steam account, and safely installs updates when a real change exists.
+
+## Screenshots
+
+### Dashboard
+
+Monitor the installed hero grid, update status, selected Steam account, and upcoming automatic checks.
+
+![MetaGrid Dashboard](docs/images/dashboard.png)
+
+### Hero Grid
+
+View the current Dota2ProTracker High Winrate grid, role layouts, heroes, and synchronization status.
+
+![MetaGrid Hero Grid](docs/images/hero-grid.png)
+
+### Settings
+
+Configure automatic updates, update intervals, backup retention, Windows startup, and system tray behavior.
+
+![MetaGrid Settings](docs/images/settings.png)
+
 ## Features
 
 - Official Dota2ProTracker High Winrate grid retrieval
