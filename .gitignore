@@ -21,6 +21,9 @@ coverage.*
 .nuget/
 tmp/
 tools/
+!tools/MetaGrid.SelfUpdateE2E/
+!tools/MetaGrid.SelfUpdateE2E/MetaGrid.SelfUpdateE2E.csproj
+!tools/MetaGrid.SelfUpdateE2E/Program.cs
 logs/
 *.log
 *.pdb

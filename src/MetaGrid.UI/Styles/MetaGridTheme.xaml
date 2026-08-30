@@ -18,6 +18,14 @@
   <SolidColorBrush x:Key="WarningSurfaceBrush" Color="#2C2417" />
   <SolidColorBrush x:Key="ErrorBrush" Color="#D37C7C" />
   <SolidColorBrush x:Key="ErrorSurfaceBrush" Color="#2D1E1E" />
+  <SolidColorBrush x:Key="DangerSurfaceBrush" Color="#2D1E1E" />
+  <SolidColorBrush x:Key="CheckActionBrush" Color="#2E5B8C" />
+  <SolidColorBrush x:Key="CheckActionHoverBrush" Color="#36689D" />
+  <SolidColorBrush x:Key="CheckActionPressedBrush" Color="#254E79" />
+  <SolidColorBrush x:Key="ForceActionBrush" Color="#8A5A26" />
+  <SolidColorBrush x:Key="ForceActionHoverBrush" Color="#99662D" />
+  <SolidColorBrush x:Key="ForceActionPressedBrush" Color="#74491D" />
+  <SolidColorBrush x:Key="AccentActionTextBrush" Color="#F5F5F5" />
   <SolidColorBrush x:Key="PrimaryActionBrush" Color="#E8E8E8" />
   <SolidColorBrush x:Key="PrimaryActionTextBrush" Color="#171717" />
   <SolidColorBrush x:Key="PrimaryActionHoverBrush" Color="#F2F2F2" />
@@ -257,6 +265,94 @@
     <Setter Property="FontSize" Value="13" />
   </Style>
 
+  <Style x:Key="CheckUpdatesButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactActionButtonStyle}">
+    <Setter Property="Background" Value="{StaticResource CheckActionBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource CheckActionBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource AccentActionTextBrush}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="AccentButtonChrome"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="14">
+            <AccessText Text="{TemplateBinding Content}"
+                        Margin="{TemplateBinding Padding}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Foreground="{TemplateBinding Foreground}"
+                        FontSize="{TemplateBinding FontSize}"
+                        FontWeight="{TemplateBinding FontWeight}" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="AccentButtonChrome" Property="Background" Value="{StaticResource CheckActionHoverBrush}" />
+              <Setter TargetName="AccentButtonChrome" Property="BorderBrush" Value="{StaticResource CheckActionHoverBrush}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="AccentButtonChrome" Property="Background" Value="{StaticResource CheckActionPressedBrush}" />
+              <Setter TargetName="AccentButtonChrome" Property="BorderBrush" Value="{StaticResource CheckActionPressedBrush}" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="AccentButtonChrome" Property="BorderBrush" Value="{StaticResource FocusBorderBrush}" />
+              <Setter TargetName="AccentButtonChrome" Property="BorderThickness" Value="1.5" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="AccentButtonChrome" Property="Background" Value="#2D3540" />
+              <Setter TargetName="AccentButtonChrome" Property="BorderBrush" Value="#2D3540" />
+              <Setter Property="Foreground" Value="#8FA0B3" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="ForceUpdateButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactActionButtonStyle}">
+    <Setter Property="Background" Value="{StaticResource ForceActionBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource ForceActionBrush}" />
+    <Setter Property="Foreground" Value="{StaticResource AccentActionTextBrush}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="ForceButtonChrome"
+                  Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="14">
+            <AccessText Text="{TemplateBinding Content}"
+                        Margin="{TemplateBinding Padding}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Foreground="{TemplateBinding Foreground}"
+                        FontSize="{TemplateBinding FontSize}"
+                        FontWeight="{TemplateBinding FontWeight}" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="ForceButtonChrome" Property="Background" Value="{StaticResource ForceActionHoverBrush}" />
+              <Setter TargetName="ForceButtonChrome" Property="BorderBrush" Value="{StaticResource ForceActionHoverBrush}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="ForceButtonChrome" Property="Background" Value="{StaticResource ForceActionPressedBrush}" />
+              <Setter TargetName="ForceButtonChrome" Property="BorderBrush" Value="{StaticResource ForceActionPressedBrush}" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="ForceButtonChrome" Property="BorderBrush" Value="{StaticResource FocusBorderBrush}" />
+              <Setter TargetName="ForceButtonChrome" Property="BorderThickness" Value="1.5" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="ForceButtonChrome" Property="Background" Value="#403428" />
+              <Setter TargetName="ForceButtonChrome" Property="BorderBrush" Value="#403428" />
+              <Setter Property="Foreground" Value="#B39A7C" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <Style x:Key="DestructiveButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactActionButtonStyle}">
     <Setter Property="Background" Value="{StaticResource ErrorSurfaceBrush}" />
     <Setter Property="BorderBrush" Value="#5A3636" />
@@ -460,6 +556,116 @@
             <Trigger Property="IsEnabled" Value="False">
               <Setter TargetName="ComboChrome" Property="Background" Value="{StaticResource ComboBoxDisabledBrush}" />
               <Setter TargetName="ComboChrome" Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
+              <Setter Property="Foreground" Value="{StaticResource ComboBoxDisabledTextBrush}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="LanguageSelectorComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+    <Setter Property="Width" Value="74" />
+    <Setter Property="MinWidth" Value="74" />
+    <Setter Property="MaxWidth" Value="74" />
+    <Setter Property="MinHeight" Value="38" />
+    <Setter Property="Height" Value="38" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="ItemTemplate">
+      <Setter.Value>
+        <DataTemplate>
+          <TextBlock Text="{Binding Label}"
+                     HorizontalAlignment="Center"
+                     TextAlignment="Center"
+                     Foreground="{StaticResource PrimaryBrush}"
+                     FontSize="13"
+                     FontWeight="SemiBold" />
+        </DataTemplate>
+      </Setter.Value>
+    </Setter>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ComboBox">
+          <Grid SnapsToDevicePixels="True">
+            <Border x:Name="LanguageChrome"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="14">
+              <Grid HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                  <ContentPresenter Margin="0,0,6,0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    IsHitTestVisible="False"
+                                    Content="{TemplateBinding SelectionBoxItem}"
+                                    ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                    ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                    TextElement.Foreground="{TemplateBinding Foreground}" />
+                  <Path Width="10"
+                        Height="6"
+                        VerticalAlignment="Center"
+                        Stroke="{TemplateBinding Foreground}"
+                        StrokeThickness="1.5"
+                        StrokeStartLineCap="Round"
+                        StrokeEndLineCap="Round"
+                        Data="M 0 0 L 5 5 L 10 0" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <ToggleButton Background="Transparent"
+                          BorderBrush="Transparent"
+                          BorderThickness="0"
+                          Focusable="False"
+                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                          ClickMode="Press" />
+
+            <Popup x:Name="PART_Popup"
+                   Placement="Bottom"
+                   AllowsTransparency="True"
+                   Focusable="False"
+                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                   PopupAnimation="Fade">
+              <Border x:Name="PopupChrome"
+                      Margin="0,6,0,0"
+                      MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                      MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                      Background="{StaticResource ComboBoxPopupBrush}"
+                      BorderBrush="{StaticResource BorderBrushSoft}"
+                      BorderThickness="1"
+                      CornerRadius="14"
+                      Padding="6">
+                <ScrollViewer CanContentScroll="True"
+                              HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                              VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
+                  <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained" />
+                </ScrollViewer>
+              </Border>
+            </Popup>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="LanguageChrome" Property="BorderBrush" Value="{StaticResource BorderBrushStrong}" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+              <Setter TargetName="LanguageChrome" Property="BorderBrush" Value="{StaticResource FocusBorderBrush}" />
+            </Trigger>
+            <Trigger Property="IsDropDownOpen" Value="True">
+              <Setter TargetName="LanguageChrome" Property="BorderBrush" Value="{StaticResource FocusBorderBrush}" />
+              <Setter TargetName="LanguageChrome" Property="Background" Value="#1B1B1B" />
+            </Trigger>
+            <Trigger Property="HasItems" Value="False">
+              <Setter TargetName="PopupChrome" Property="MinHeight" Value="40" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="LanguageChrome" Property="Background" Value="{StaticResource ComboBoxDisabledBrush}" />
+              <Setter TargetName="LanguageChrome" Property="BorderBrush" Value="{StaticResource BorderBrushSoft}" />
               <Setter Property="Foreground" Value="{StaticResource ComboBoxDisabledTextBrush}" />
             </Trigger>
           </ControlTemplate.Triggers>

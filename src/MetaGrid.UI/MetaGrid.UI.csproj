@@ -4,16 +4,18 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>MetaGrid</AssemblyName>
     <Product>MetaGrid</Product>
     <AssemblyTitle>MetaGrid</AssemblyTitle>
     <Description>Dota 2 Hero Grid Updater</Description>
     <Company>Darvel &amp; Codex</Company>
     <Authors>Darvel &amp; Codex</Authors>
-    <Version>0.1.0</Version>
-    <FileVersion>0.1.0.0</FileVersion>
-    <AssemblyVersion>0.1.0.0</AssemblyVersion>
-    <InformationalVersion>0.1.0</InformationalVersion>
+    <Version>0.1.1</Version>
+    <FileVersion>0.1.1.0</FileVersion>
+    <AssemblyVersion>0.1.1.0</AssemblyVersion>
+    <InformationalVersion>0.1.1</InformationalVersion>
     <ApplicationIcon>Assets\metagrid.ico</ApplicationIcon>
   </PropertyGroup>
 

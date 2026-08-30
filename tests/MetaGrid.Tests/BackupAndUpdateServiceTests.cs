@@ -514,6 +514,32 @@ public sealed class BackupAndUpdateServiceTests
     }
 
     [Fact]
+    public async Task ForceInstallLatestAsync_RewritesLatestLiveGrid_EvenWhenHashesAlreadyMatch()
+    {
+        using var temp = new TemporaryDirectory();
+        var paths = new TestAppPaths(temp.Path);
+        var logging = new FileLoggingService(paths);
+        var backupService = new BackupService(paths);
+        var historyService = new HistoryService(paths);
+        var dotaGridService = new DotaGridService();
+        var snapshot = StubProvider.CreateSnapshot(Enumerable.Range(1, 55).ToArray(), sourceName: "OpenDota");
+        var provider = new StubProvider(snapshot);
+        var updateService = new UpdateService(provider, dotaGridService, backupService, historyService, logging, new FakeHeroCatalogService());
+        var settings = new AppSettings();
+        var account = CreateMissingGridAccountFixture(paths);
+
+        var firstInstall = await updateService.InstallGridAsync([account], settings, CreateInstallSnapshot(snapshot, account), CancellationToken.None);
+        account.CurrentMetaGridHash = firstInstall.GridHash;
+
+        var result = await updateService.ForceInstallLatestAsync([account], settings, CancellationToken.None);
+        var backups = await backupService.GetBackupsAsync(CancellationToken.None);
+
+        Assert.Equal(UpdateStatus.Updated, result.Status);
+        Assert.Single(backups);
+        Assert.Equal(firstInstall.GridHash, result.GridHash);
+    }
+
+    [Fact]
     public async Task BackupService_AssociatesBackups_WithAccountAndOriginalPath()
     {
         using var temp = new TemporaryDirectory();
@@ -637,6 +663,8 @@ public sealed class BackupAndUpdateServiceTests
 
         public DotaHeroGridFile ApplySnapshot(DotaHeroGridFile existing, HeroGridSnapshot snapshot) => _inner.ApplySnapshot(existing, snapshot);
         public Task<DotaHeroGridFile> ReadAsync(string configPath, CancellationToken cancellationToken) => _inner.ReadAsync(configPath, cancellationToken);
+        public Task<InstalledMetaGridInspectionResult> InspectInstalledMetaGridAsync(string configPath, CancellationToken cancellationToken)
+            => _inner.InspectInstalledMetaGridAsync(configPath, cancellationToken);
         public string? ReadInstalledMetaGridHash(DotaHeroGridFile file)
             => _inner.ReadInstalledMetaGridHash(file);
         public Task<string?> ReadInstalledMetaGridHashAsync(string configPath, CancellationToken cancellationToken)
@@ -651,6 +679,7 @@ public sealed class BackupAndUpdateServiceTests
             var actual = _inner.ComputeCanonicalHash(snapshot);
             return _canonicalHashCount >= 3 ? "MISMATCHED_HASH" : actual;
         }
+        public NativeGridStructureValidationResult ValidateNativeStructure(DotaHeroGridFile file) => _inner.ValidateNativeStructure(file);
         public string SummarizeDifference(CanonicalHeroGridSnapshot expected, CanonicalHeroGridSnapshot actual) => _inner.SummarizeDifference(expected, actual);
         public string NormalizeSnapshot(HeroGridSnapshot snapshot) => _inner.NormalizeSnapshot(snapshot);
         public string Serialize(DotaHeroGridFile file) => _inner.Serialize(file);

@@ -19,4 +19,6 @@ public sealed class SteamAccount
     public bool HasHeroGridConfig { get; set; }
     public bool IsSelected { get; set; }
     public string? CurrentMetaGridHash { get; set; }
+    public InstalledMetaGridState InstalledMetaGridState { get; set; } = InstalledMetaGridState.Unknown;
+    public string? InstalledMetaGridError { get; set; }
 }

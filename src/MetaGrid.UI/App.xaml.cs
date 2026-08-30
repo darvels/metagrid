@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -30,19 +31,56 @@ public partial class App : System.Windows.Application
             services.AddSingleton<ISettingsService, SettingsService>();
             services.AddSingleton<IHistoryService, HistoryService>();
             services.AddSingleton<ILoggingService, FileLoggingService>();
+            services.AddSingleton<IAppRuntimeInfo, AppRuntimeInfoService>();
             services.AddSingleton<ISteamLocatorService, SteamLocatorService>();
             services.AddSingleton<IDotaGridService, DotaGridService>();
             services.AddSingleton<ISteamAccountService, SteamAccountService>();
             services.AddSingleton<IHeroCatalogService, HeroCatalogService>();
             services.AddSingleton<ID2ptOfficialGridRetrievalService, D2ptOfficialGridRetrievalService>();
             services.AddSingleton<GridSnapshotCacheService>();
+            services.AddSingleton<IPlayerProfileInputParser, PlayerProfileInputParser>();
+            services.AddSingleton<IOpenDotaClient>(_ =>
+            {
+                var client = new HttpClient
+                {
+                    BaseAddress = new Uri("https://api.opendota.com"),
+                    Timeout = TimeSpan.FromSeconds(20)
+                };
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("MetaGrid/1.0");
+                return new OpenDotaClient(client);
+            });
+            services.AddSingleton<IPersonalHeroSelector, PersonalHeroSelector>();
+            services.AddSingleton<IPersonalHeroCacheService, PersonalHeroCacheService>();
+            services.AddSingleton<IPersonalizedGridComposer, PersonalizedGridComposer>();
+            services.AddSingleton<IPersonalizationService, PersonalizationService>();
             services.AddSingleton<IHeroGridProvider, OfficialD2ptHeroGridProvider>();
             services.AddSingleton<IBackupService, BackupService>();
             services.AddSingleton<IGridComparisonService, GridComparisonService>();
             services.AddSingleton<IUpdateService, UpdateService>();
+            services.AddSingleton<IGitHubReleaseClient>(_ =>
+            {
+                var client = new HttpClient
+                {
+                    Timeout = TimeSpan.FromSeconds(20)
+                };
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("MetaGrid/1.0");
+                return new GitHubReleaseClient(client);
+            });
+            services.AddSingleton<IAppUpdateDownloader>(sp =>
+            {
+                var client = new HttpClient
+                {
+                    Timeout = TimeSpan.FromMinutes(2)
+                };
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("MetaGrid/1.0");
+                return new AppUpdateDownloader(client, sp.GetRequiredService<IAppPaths>());
+            });
+            services.AddSingleton<IUpdaterLauncher, UpdaterLauncher>();
+            services.AddSingleton<IAppUpdateService, GitHubAppUpdateService>();
             services.AddSingleton<IStartupService, StartupService>();
             services.AddSingleton<IAppClock, AppClock>();
             services.AddSingleton<IUiDispatcher, WpfUiDispatcher>();
+            services.AddSingleton<UiTextService>();
             services.AddSingleton<NotificationService>();
             services.AddSingleton<INotificationService>(sp => sp.GetRequiredService<NotificationService>());
             services.AddSingleton<MainViewModel>();

@@ -8,8 +8,12 @@ What it does:
 - Retrieves the official Dota2ProTracker High Winrate hero grid
 - Checks for updates
 - Safely installs or updates the grid for the selected Steam account
+- Checks GitHub Releases for newer MetaGrid application builds
+- Includes the MetaGrid self-update helper for future in-place application updates
 - Preserves unrelated custom hero grids where supported
 - Creates backups before changes
+- Starting with MetaGrid v0.1.1, future compatible MetaGrid application releases can be installed from inside the app
+- Users on MetaGrid v0.1.0 must manually download and install v0.1.1 once because v0.1.0 did not include the built-in app updater
 
 Basic usage:
 1. Run MetaGrid.

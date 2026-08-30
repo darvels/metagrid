@@ -46,7 +46,10 @@ public sealed class SteamAccountService(
                                  string.Equals(settings.PreferredAccountId, accountId, StringComparison.OrdinalIgnoreCase)
                 };
 
-                account.CurrentMetaGridHash = await dotaGridService.ReadInstalledMetaGridHashAsync(gridPath, cancellationToken);
+                var inspection = await dotaGridService.InspectInstalledMetaGridAsync(gridPath, cancellationToken);
+                account.CurrentMetaGridHash = inspection.InstalledHash;
+                account.InstalledMetaGridState = inspection.State;
+                account.InstalledMetaGridError = inspection.Error;
                 accounts.Add(account);
             }
         }

@@ -60,6 +60,15 @@ public enum GridOriginKind
     Cached
 }
 
+public enum InstalledMetaGridState
+{
+    Unknown,
+    MissingFile,
+    MalformedFile,
+    NoManagedGrid,
+    Present
+}
+
 public enum LogLevelKind
 {
     Debug,
@@ -67,4 +76,10 @@ public enum LogLevelKind
     Warning,
     Error,
     Critical
+}
+
+public enum AppLanguage
+{
+    English,
+    Russian
 }

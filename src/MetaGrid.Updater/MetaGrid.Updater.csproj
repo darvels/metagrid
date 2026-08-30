@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>MetaGrid.Updater</AssemblyName>
+    <RootNamespace>MetaGrid.Updater</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MetaGrid.Core\MetaGrid.Core.csproj" />
+    <ProjectReference Include="..\MetaGrid.Infrastructure\MetaGrid.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

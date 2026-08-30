@@ -15,6 +15,12 @@ public sealed class UpdateHistoryEntry
     public string? NewHash { get; init; }
     public string? AvailableHash { get; init; }
     public string? InstalledHash { get; init; }
+    public string? BaseSourceHash { get; init; }
+    public string? EffectiveGridHash { get; init; }
+    public string? PersonalizationStatus { get; init; }
+    public string? PersonalizationMessage { get; init; }
+    public string? PersonalizationAccountId { get; init; }
+    public bool PersonalizationUsedCache { get; init; }
     public string? BackupFilePath { get; init; }
     public string? BackupOperationId { get; init; }
     public string? BackupHash { get; init; }
@@ -37,6 +43,14 @@ public sealed class UpdateRunResult
     public string? ProviderMessage { get; init; }
     public string? AvailableHash { get; init; }
     public string? InstalledHash { get; init; }
+    public string? BaseSourceHash { get; init; }
+    public string? EffectiveGridHash { get; init; }
+    public string? PersonalizationStatus { get; init; }
+    public string? PersonalizationMessage { get; init; }
+    public string? PersonalizationAccountId { get; init; }
+    public string? PersonalizationAccountDisplayName { get; init; }
+    public bool PersonalizationUsedCache { get; init; }
+    public int PersonalHeroCount { get; init; }
     public string? OperationId { get; init; }
     public string? TargetPath { get; init; }
     public BackupEntry? BackupEntry { get; init; }

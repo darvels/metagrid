@@ -14,7 +14,10 @@ internal sealed class TestAppPaths(string root) : IAppPaths
     public string CacheDirectory => Path.Combine(_root, "Cache");
     public string CachedGridSnapshotPath => Path.Combine(CacheDirectory, "last-good-grid.json");
     public string CachedGridPayloadPath => Path.Combine(CacheDirectory, "last-good-grid.raw.json");
+    public string PersonalizationCacheDirectory => Path.Combine(CacheDirectory, "Personalization");
     public string D2ptCacheDirectory => Path.Combine(CacheDirectory, "D2PT");
     public string D2ptTempDirectory => Path.Combine(D2ptCacheDirectory, "Temp");
     public string D2ptWebView2ProfileDirectory => Path.Combine(_root, "WebView2", "D2PT");
+    public string AppUpdateDirectory => Path.Combine(_root, "AppUpdate");
+    public string AppUpdateSessionDirectory => Path.Combine(AppUpdateDirectory, "Sessions");
 }

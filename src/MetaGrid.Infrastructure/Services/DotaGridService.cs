@@ -28,12 +28,67 @@ public sealed class DotaGridService : IDotaGridService
 
     public async Task<string?> ReadInstalledMetaGridHashAsync(string configPath, CancellationToken cancellationToken)
     {
-        var file = await ReadAsync(configPath, cancellationToken);
-        return ReadInstalledMetaGridHash(file);
+        var inspection = await InspectInstalledMetaGridAsync(configPath, cancellationToken);
+        return inspection.InstalledHash;
     }
 
     public string? ReadInstalledMetaGridHash(DotaHeroGridFile file)
         => ExtractManagedGrid(file) is { } canonical ? ComputeCanonicalHash(canonical) : null;
+
+    public async Task<InstalledMetaGridInspectionResult> InspectInstalledMetaGridAsync(string configPath, CancellationToken cancellationToken)
+    {
+        if (!File.Exists(configPath))
+        {
+            return new InstalledMetaGridInspectionResult
+            {
+                State = InstalledMetaGridState.MissingFile
+            };
+        }
+
+        try
+        {
+            await using var stream = File.OpenRead(configPath);
+            var file = await JsonSerializer.DeserializeAsync<DotaHeroGridFile>(stream, JsonDefaults.StrictIndented, cancellationToken)
+                ?? new DotaHeroGridFile();
+            var structure = ValidateNativeStructure(file);
+            if (!structure.IsValid)
+            {
+                return new InstalledMetaGridInspectionResult
+                {
+                    State = InstalledMetaGridState.MalformedFile,
+                    Error = structure.Error
+                };
+            }
+
+            var managedSnapshot = ExtractManagedGrid(file);
+            if (managedSnapshot is null)
+            {
+                return new InstalledMetaGridInspectionResult
+                {
+                    State = InstalledMetaGridState.NoManagedGrid
+                };
+            }
+
+            return new InstalledMetaGridInspectionResult
+            {
+                State = InstalledMetaGridState.Present,
+                InstalledHash = ComputeCanonicalHash(managedSnapshot),
+                ManagedLayoutCount = managedSnapshot.Layouts.Count,
+                ManagedCategoryCount = managedSnapshot.Layouts.Sum(layout => layout.Categories.Count),
+                HasAllRoleLayout = managedSnapshot.Layouts.Any(layout => layout.Name.Contains("All Roles", StringComparison.OrdinalIgnoreCase)),
+                HasRoleSpecificLayouts = managedSnapshot.Layouts.Any(layout =>
+                    !layout.Name.Contains("All Roles", StringComparison.OrdinalIgnoreCase))
+            };
+        }
+        catch (JsonException ex)
+        {
+            return new InstalledMetaGridInspectionResult
+            {
+                State = InstalledMetaGridState.MalformedFile,
+                Error = ex.Message
+            };
+        }
+    }
 
     public DotaHeroGridFile ApplySnapshot(DotaHeroGridFile existing, HeroGridSnapshot snapshot)
     {
@@ -104,6 +159,56 @@ public sealed class DotaGridService : IDotaGridService
 
     public string ComputeCanonicalHash(CanonicalHeroGridSnapshot snapshot)
         => HashUtilities.Sha256(NormalizeCanonical(snapshot));
+
+    public NativeGridStructureValidationResult ValidateNativeStructure(DotaHeroGridFile file)
+    {
+        if (file.Version <= 0)
+        {
+            return Invalid("Missing or invalid top-level version.");
+        }
+
+        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var layout in file.Configs)
+        {
+            if (string.IsNullOrWhiteSpace(layout.ConfigName))
+            {
+                return Invalid("A grid entry is missing config_name.");
+            }
+
+            if (!seenNames.Add(layout.ConfigName.Trim()))
+            {
+                return Invalid($"Duplicate config_name detected: '{layout.ConfigName}'.");
+            }
+
+            if (layout.Categories is null)
+            {
+                return Invalid($"Grid '{layout.ConfigName}' is missing categories.");
+            }
+
+            foreach (var category in layout.Categories)
+            {
+                if (string.IsNullOrWhiteSpace(category.CategoryName))
+                {
+                    return Invalid($"Grid '{layout.ConfigName}' has a category with no category_name.");
+                }
+
+                if (category.HeroIds is null)
+                {
+                    return Invalid($"Grid '{layout.ConfigName}' category '{category.CategoryName}' is missing hero_ids.");
+                }
+
+                if (category.Width <= 0 || category.Height <= 0)
+                {
+                    return Invalid($"Grid '{layout.ConfigName}' category '{category.CategoryName}' has invalid width/height.");
+                }
+            }
+        }
+
+        return new NativeGridStructureValidationResult
+        {
+            IsValid = true
+        };
+    }
 
     public string SummarizeDifference(CanonicalHeroGridSnapshot expected, CanonicalHeroGridSnapshot actual)
     {
@@ -189,6 +294,13 @@ public sealed class DotaGridService : IDotaGridService
             return false;
         }
     }
+
+    private static NativeGridStructureValidationResult Invalid(string error)
+        => new()
+        {
+            IsValid = false,
+            Error = error
+        };
 
     private static IEnumerable<DotaHeroGridLayout> CreateLayouts(HeroGridSnapshot snapshot)
     {

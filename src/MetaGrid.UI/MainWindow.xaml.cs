@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Resources;
+using MetaGrid.Core.Models;
 using MetaGrid.UI.Services;
 using MetaGrid.UI.ViewModels;
 
@@ -14,6 +15,7 @@ public partial class MainWindow : Window
     private readonly Stream? _trayIconStream;
     private readonly System.Drawing.Icon? _trayIcon;
     private readonly MainViewModel _viewModel;
+    private readonly UiTextService _text;
     private bool _closeHintShownThisSession;
     private readonly ToolStripMenuItem _statusMenuItem;
 
@@ -24,6 +26,7 @@ public partial class MainWindow : Window
         StartupDiagnostics.LogDebug("MainWindow constructor completed InitializeComponent.");
 
         _viewModel = (MainViewModel)App.Services.GetService(typeof(MainViewModel))!;
+        _text = (UiTextService)App.Services.GetService(typeof(UiTextService))!;
         DataContext = _viewModel;
         StartupDiagnostics.LogDebug("MainWindow constructor assigned DataContext.");
 
@@ -41,7 +44,9 @@ public partial class MainWindow : Window
             ContextMenuStrip = BuildMenu()
         };
         _notifyIcon.DoubleClick += (_, _) => ShowFromTray();
-        _notifyIcon.ContextMenuStrip!.Opening += (_, _) => _statusMenuItem.Text = $"Status: {_viewModel.StatusChipText}";
+        _notifyIcon.ContextMenuStrip!.Opening += (_, _) => _statusMenuItem.Text = _text.Language == AppLanguage.Russian
+            ? $"Статус: {_viewModel.StatusChipText}"
+            : $"Status: {_viewModel.StatusChipText}";
 
         ((NotificationService)App.Services.GetService(typeof(NotificationService))!).NotifyIcon = _notifyIcon;
         StartupDiagnostics.LogDebug($"MainWindow initialized. Tray icon loaded={_trayIcon is not null}.");
@@ -60,6 +65,7 @@ public partial class MainWindow : Window
         {
             _notifyIcon.Visible = false;
         }
+
         base.OnClosing(e);
     }
 
@@ -102,19 +108,20 @@ public partial class MainWindow : Window
         var menu = new ContextMenuStrip();
         menu.Items.Add("MetaGrid");
         menu.Items.Add(_statusMenuItem);
-        menu.Items.Add("Open MetaGrid", null, (_, _) => ShowFromTray());
-        menu.Items.Add("Check for Updates", null, (_, _) => _viewModel.CheckNowCommand.Execute(null));
-        menu.Items.Add("Settings", null, (_, _) =>
+        menu.Items.Add(_text.Translate("Open MetaGrid"), null, (_, _) => ShowFromTray());
+        menu.Items.Add(_text.CheckForUpdates, null, (_, _) => _viewModel.CheckNowCommand.Execute(null));
+        menu.Items.Add(_text.Settings, null, (_, _) =>
         {
             ShowFromTray();
             _viewModel.SelectedPage = AppPage.Settings;
         });
-        menu.Items.Add("Exit", null, (_, _) =>
+        menu.Items.Add(_text.T("Exit", "Выход"), null, (_, _) =>
         {
             if (_notifyIcon is not null)
             {
                 _notifyIcon.Visible = false;
             }
+
             _viewModel.Settings.CloseToTray = false;
             Close();
         });

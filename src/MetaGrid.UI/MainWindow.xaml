@@ -6,10 +6,10 @@
         mc:Ignorable="d"
         Title="MetaGrid"
         Icon="Assets/metagrid.ico"
-        Width="1100"
-        Height="720"
-        MinWidth="980"
-        MinHeight="660"
+        Width="1240"
+        Height="800"
+        MinWidth="1080"
+        MinHeight="700"
         WindowStartupLocation="CenterScreen"
         WindowState="Normal"
         ShowInTaskbar="True"
@@ -19,8 +19,8 @@
         WindowStyle="SingleBorderWindow">
   <Grid Margin="20">
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="248" />
-      <ColumnDefinition Width="20" />
+      <ColumnDefinition Width="264" />
+      <ColumnDefinition Width="24" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
 
@@ -36,7 +36,7 @@
 
         <StackPanel HorizontalAlignment="Center">
           <TextBlock Text="MetaGrid" Style="{StaticResource PageTitleTextStyle}" FontSize="28" TextAlignment="Center" />
-          <TextBlock Text="Dota 2 Hero Grid Updater"
+          <TextBlock Text="{Binding Text.AppSubtitle}"
                      Margin="0,6,0,0"
                      Foreground="{StaticResource SecondaryBrush}"
                      TextAlignment="Center"
@@ -44,20 +44,20 @@
         </StackPanel>
 
         <StackPanel Grid.Row="2"
-                    Width="180"
+                    Width="192"
                     HorizontalAlignment="Center"
                     VerticalAlignment="Top"
                     Margin="0,10,0,0">
-          <Button Style="{StaticResource SidebarButtonStyle}" Click="DashboardClick">Dashboard</Button>
-          <Button Style="{StaticResource SidebarButtonStyle}" Click="HeroGridClick">Hero Grid</Button>
-          <Button Style="{StaticResource SidebarButtonStyle}" Click="AccountsClick">Accounts</Button>
-          <Button Style="{StaticResource SidebarButtonStyle}" Click="HistoryClick">Update History</Button>
-          <Button Style="{StaticResource SidebarButtonStyle}" Click="SettingsClick">Settings</Button>
-          <Button Style="{StaticResource SidebarButtonStyle}" Click="AboutClick">About</Button>
+          <Button Style="{StaticResource SidebarButtonStyle}" Click="DashboardClick" Content="{Binding Text.Dashboard}" />
+          <Button Style="{StaticResource SidebarButtonStyle}" Click="HeroGridClick" Content="{Binding Text.HeroGrid}" />
+          <Button Style="{StaticResource SidebarButtonStyle}" Click="AccountsClick" Content="{Binding Text.Accounts}" />
+          <Button Style="{StaticResource SidebarButtonStyle}" Click="HistoryClick" Content="{Binding Text.UpdateHistory}" />
+          <Button Style="{StaticResource SidebarButtonStyle}" Click="SettingsClick" Content="{Binding Text.Settings}" />
+          <Button Style="{StaticResource SidebarButtonStyle}" Click="AboutClick" Content="{Binding Text.About}" />
         </StackPanel>
 
         <StackPanel Grid.Row="4" HorizontalAlignment="Center">
-          <Border Style="{StaticResource CardBorderStyle}" Padding="14" Width="176">
+          <Border Style="{StaticResource CardBorderStyle}" Padding="14" Width="188">
             <StackPanel>
               <TextBlock Text="{Binding ProviderCardTitle}"
                          Style="{StaticResource FieldLabelTextStyle}"
@@ -67,28 +67,9 @@
                           Margin="0,10,0,0"
                           HorizontalAlignment="Center">
                 <Ellipse Width="8" Height="8" Margin="0,4,8,0">
-                  <Ellipse.Style>
-                    <Style TargetType="Ellipse">
-                      <Setter Property="Fill" Value="{StaticResource MutedBrush}" />
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding ProviderStatusText}" Value="D2PT Online">
-                          <Setter Property="Fill" Value="{StaticResource SuccessBrush}" />
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding ProviderStatusText}" Value="Cached data">
-                          <Setter Property="Fill" Value="{StaticResource WarningBrush}" />
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding ProviderStatusText}" Value="D2PT blocked by Cloudflare">
-                          <Setter Property="Fill" Value="{StaticResource WarningBrush}" />
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding ProviderStatusText}" Value="Source unavailable">
-                          <Setter Property="Fill" Value="{StaticResource ErrorBrush}" />
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding ProviderStatusText}" Value="D2PT unavailable">
-                          <Setter Property="Fill" Value="{StaticResource ErrorBrush}" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </Ellipse.Style>
+                  <Ellipse.Fill>
+                    <Binding Path="ProviderIndicatorBrush" />
+                  </Ellipse.Fill>
                 </Ellipse>
                 <TextBlock Text="{Binding ProviderStatusText}"
                            Foreground="{StaticResource PrimaryBrush}"
@@ -97,7 +78,7 @@
               </StackPanel>
             </StackPanel>
           </Border>
-          <TextBlock Text="Made by Darvel &amp; Codex"
+          <TextBlock Text="{Binding Text.MadeBy}"
                      Margin="0,10,0,0"
                      Foreground="{StaticResource MutedBrush}"
                      FontSize="11"
@@ -114,13 +95,13 @@
         <RowDefinition Height="*" />
       </Grid.RowDefinitions>
 
-      <Border Style="{StaticResource PanelBorderStyle}" Padding="20,18,20,16">
+      <Border Style="{StaticResource PanelBorderStyle}" Padding="22,20,22,18">
         <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="20" />
-            <ColumnDefinition Width="Auto" />
-          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="16" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
 
           <StackPanel>
             <TextBlock Text="{Binding StatusTitle}" Style="{StaticResource PageTitleTextStyle}" />
@@ -129,71 +110,53 @@
                        Foreground="{StaticResource SecondaryBrush}"
                        TextWrapping="Wrap" />
             <WrapPanel Margin="0,14,0,0">
-              <Border Style="{StaticResource StatusChipWarningBorderStyle}">
+              <Border Style="{StaticResource StatusChipBorderStyle}"
+                      Background="{Binding StatusChipBackgroundBrush}"
+                      BorderBrush="{Binding StatusChipBorderBrush}">
                 <TextBlock Text="{Binding StatusChipText}" Style="{StaticResource StatusChipTextStyle}" />
               </Border>
               <Border Style="{StaticResource StatusChipSuccessBorderStyle}">
                 <TextBlock Text="{Binding AutoUpdateChipText}" Style="{StaticResource StatusChipTextStyle}" />
               </Border>
-              <Border>
-                <Border.Style>
-                  <Style TargetType="Border" BasedOn="{StaticResource StatusChipBorderStyle}">
-                    <Style.Triggers>
-                      <DataTrigger Binding="{Binding ProviderStatusChipText}" Value="D2PT Online">
-                        <Setter Property="Background" Value="{StaticResource SuccessSurfaceBrush}" />
-                        <Setter Property="BorderBrush" Value="#355340" />
-                      </DataTrigger>
-                      <DataTrigger Binding="{Binding ProviderStatusChipText}" Value="Source unavailable">
-                        <Setter Property="Background" Value="{StaticResource ErrorSurfaceBrush}" />
-                        <Setter Property="BorderBrush" Value="#5A3636" />
-                      </DataTrigger>
-                      <DataTrigger Binding="{Binding ProviderStatusChipText}" Value="D2PT blocked">
-                        <Setter Property="Background" Value="{StaticResource WarningSurfaceBrush}" />
-                        <Setter Property="BorderBrush" Value="#5A4727" />
-                      </DataTrigger>
-                      <DataTrigger Binding="{Binding ProviderStatusChipText}" Value="D2PT limited">
-                        <Setter Property="Background" Value="{StaticResource WarningSurfaceBrush}" />
-                        <Setter Property="BorderBrush" Value="#5A4727" />
-                      </DataTrigger>
-                      <DataTrigger Binding="{Binding ProviderStatusChipText}" Value="Network issue">
-                        <Setter Property="Background" Value="{StaticResource WarningSurfaceBrush}" />
-                        <Setter Property="BorderBrush" Value="#5A4727" />
-                      </DataTrigger>
-                      <DataTrigger Binding="{Binding ProviderStatusChipText}" Value="Unexpected response">
-                        <Setter Property="Background" Value="{StaticResource ErrorSurfaceBrush}" />
-                        <Setter Property="BorderBrush" Value="#5A3636" />
-                      </DataTrigger>
-                      <DataTrigger Binding="{Binding ProviderStatusChipText}" Value="Payload invalid">
-                        <Setter Property="Background" Value="{StaticResource ErrorSurfaceBrush}" />
-                        <Setter Property="BorderBrush" Value="#5A3636" />
-                      </DataTrigger>
-                      <DataTrigger Binding="{Binding ProviderStatusChipText}" Value="Using cached grid">
-                        <Setter Property="Background" Value="{StaticResource WarningSurfaceBrush}" />
-                        <Setter Property="BorderBrush" Value="#5A4727" />
-                      </DataTrigger>
-                    </Style.Triggers>
-                  </Style>
-                </Border.Style>
+              <Border Style="{StaticResource StatusChipBorderStyle}"
+                      Background="{Binding ProviderStatusChipBackgroundBrush}"
+                      BorderBrush="{Binding ProviderStatusChipBorderBrush}">
                 <TextBlock Text="{Binding ProviderStatusChipText}" Style="{StaticResource StatusChipTextStyle}" />
               </Border>
             </WrapPanel>
           </StackPanel>
 
-          <WrapPanel Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Top">
-            <Button Content="{Binding InstallActionText}"
-                    Style="{StaticResource PrimaryButtonStyle}"
-                    Click="InstallGridClick"
-                    Margin="0,0,12,8"
-                    Visibility="{Binding CanOfferInstallAction, Converter={StaticResource BoolToVisibilityConverter}}" />
-            <Button Content="Check for Updates"
-                    Style="{StaticResource CompactActionButtonStyle}"
-                    Command="{Binding CheckNowCommand}"
-                    Margin="0,0,12,8" />
-            <Button Content="Force Refresh"
-                    Style="{StaticResource CompactActionButtonStyle}"
-                    Command="{Binding ForceRefreshCommand}"
-                    Margin="0,0,0,8" />
-          </WrapPanel>
+          <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <WrapPanel Grid.Column="0" HorizontalAlignment="Left">
+              <Button Content="{Binding InstallActionText}"
+                      Style="{StaticResource PrimaryButtonStyle}"
+                      Click="InstallGridClick"
+                      Margin="0,0,12,8"
+                      Visibility="{Binding CanOfferInstallAction, Converter={StaticResource BoolToVisibilityConverter}}" />
+              <Button Content="{Binding Text.CheckForUpdates}"
+                      Style="{StaticResource CheckUpdatesButtonStyle}"
+                      Command="{Binding CheckNowCommand}"
+                      Margin="0,0,12,8" />
+              <Button Content="{Binding Text.ForceUpdate}"
+                      Style="{StaticResource ForceUpdateButtonStyle}"
+                      Command="{Binding ForceRefreshCommand}"
+                      Margin="0,0,12,8" />
+            </WrapPanel>
+
+            <ComboBox Grid.Column="1"
+                      Style="{StaticResource LanguageSelectorComboBoxStyle}"
+                      Margin="0,0,0,8"
+                      HorizontalAlignment="Right"
+                      VerticalAlignment="Top"
+                      ItemsSource="{Binding LanguageOptions}"
+                      SelectedItem="{Binding SelectedLanguageOption}"
+                      DisplayMemberPath="Label" />
+          </Grid>
         </Grid>
       </Border>
 
@@ -219,41 +182,66 @@
                 <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
 
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="12" />
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="12" />
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="12" />
-                  <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
-                  <StackPanel>
-                    <TextBlock Text="Last Checked" Style="{StaticResource FieldLabelTextStyle}" />
-                    <TextBlock Text="{Binding LastCheckedText}" Style="{StaticResource ValueTextStyle}" Margin="0,10,0,0" FontSize="17" />
-                  </StackPanel>
+              <StackPanel>
+                <Border Style="{StaticResource CardBorderStyle}"
+                        Margin="0,0,0,18"
+                        Background="{StaticResource WarningSurfaceBrush}"
+                        BorderBrush="#5A4727"
+                        Visibility="{Binding ShowAppUpdateBanner, Converter={StaticResource BoolToVisibilityConverter}}">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Margin="0,0,18,0">
+                      <TextBlock Text="{Binding AppUpdateBannerTitle}" Style="{StaticResource SectionTitleTextStyle}" />
+                      <TextBlock Text="{Binding AppUpdateBannerText}"
+                                 Margin="0,10,0,0"
+                                 Style="{StaticResource HelperTextStyle}"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                    <WrapPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+                      <Button Content="{Binding UpdateNowLabel}"
+                              Style="{StaticResource PrimaryButtonStyle}"
+                              Command="{Binding InstallAppUpdateCommand}"
+                              MinWidth="132"
+                              Margin="0,0,10,10" />
+                      <Button Content="{Binding LaterLabel}"
+                              Style="{StaticResource CompactActionButtonStyle}"
+                              Command="{Binding LaterAppUpdateCommand}"
+                              MinWidth="92"
+                              Margin="0,0,0,10" />
+                    </WrapPanel>
+                  </Grid>
                 </Border>
-                <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
-                  <StackPanel>
-                    <TextBlock Text="Last Updated" Style="{StaticResource FieldLabelTextStyle}" />
-                    <TextBlock Text="{Binding LastUpdatedText}" Style="{StaticResource ValueTextStyle}" Margin="0,10,0,0" FontSize="17" />
-                  </StackPanel>
-                </Border>
-                <Border Grid.Column="4" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
-                  <StackPanel>
-                    <TextBlock Text="Selected Account" Style="{StaticResource FieldLabelTextStyle}" />
-                    <TextBlock Text="{Binding SelectedAccountText}" Style="{StaticResource ValueTextStyle}" Margin="0,10,0,0" FontSize="17" />
-                  </StackPanel>
-                </Border>
-                <Border Grid.Column="6" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
-                  <StackPanel>
-                    <TextBlock Text="Next Check" Style="{StaticResource FieldLabelTextStyle}" />
-                    <TextBlock Text="{Binding NextCheckText}" Style="{StaticResource ValueTextStyle}" Margin="0,10,0,0" FontSize="17" />
-                  </StackPanel>
-                </Border>
-              </Grid>
+
+                <WrapPanel ItemWidth="236" Margin="0,0,0,4">
+                  <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="220">
+                    <StackPanel>
+                      <TextBlock Text="{Binding Text.LastChecked}" Style="{StaticResource FieldLabelTextStyle}" />
+                      <TextBlock Text="{Binding LastCheckedText}" Style="{StaticResource ValueTextStyle}" Margin="0,10,0,0" FontSize="17" />
+                    </StackPanel>
+                  </Border>
+                  <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="220">
+                    <StackPanel>
+                      <TextBlock Text="{Binding Text.LastUpdated}" Style="{StaticResource FieldLabelTextStyle}" />
+                      <TextBlock Text="{Binding LastUpdatedText}" Style="{StaticResource ValueTextStyle}" Margin="0,10,0,0" FontSize="17" />
+                    </StackPanel>
+                  </Border>
+                  <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="220">
+                    <StackPanel>
+                      <TextBlock Text="{Binding Text.SelectedAccount}" Style="{StaticResource FieldLabelTextStyle}" />
+                      <TextBlock Text="{Binding SelectedAccountText}" Style="{StaticResource ValueTextStyle}" Margin="0,10,0,0" FontSize="17" />
+                    </StackPanel>
+                  </Border>
+                  <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="220">
+                    <StackPanel>
+                      <TextBlock Text="{Binding Text.NextCheck}" Style="{StaticResource FieldLabelTextStyle}" />
+                      <TextBlock Text="{Binding NextCheckText}" Style="{StaticResource ValueTextStyle}" Margin="0,10,0,0" FontSize="17" />
+                    </StackPanel>
+                  </Border>
+                </WrapPanel>
+              </StackPanel>
 
               <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}">
                 <Grid>
@@ -264,58 +252,49 @@
                   </Grid.RowDefinitions>
 
                   <StackPanel Margin="0,0,8,0">
-                    <TextBlock Text="Hero Grid" Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock Text="{Binding Text.HeroGrid}" Style="{StaticResource SectionTitleTextStyle}" />
                     <TextBlock Text="{Binding StatusTitle}" Margin="0,12,0,0" FontSize="32" FontWeight="SemiBold" TextWrapping="Wrap" />
                     <TextBlock Text="{Binding StatusText}" Margin="0,8,0,0" Style="{StaticResource HelperTextStyle}" />
                   </StackPanel>
 
-                  <Grid Grid.Row="2">
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="*" />
-                      <ColumnDefinition Width="12" />
-                      <ColumnDefinition Width="*" />
-                      <ColumnDefinition Width="12" />
-                      <ColumnDefinition Width="*" />
-                      <ColumnDefinition Width="12" />
-                      <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}">
+                  <WrapPanel Grid.Row="2" ItemWidth="248" Margin="0,0,0,4">
+                    <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="232">
                       <StackPanel>
-                        <TextBlock Text="Source" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBlock Text="{Binding Text.Source}" Style="{StaticResource FieldLabelTextStyle}" />
                         <TextBlock Text="{Binding CurrentSourceText}"
                                    Margin="0,10,0,0"
                                    Style="{StaticResource HelperTextStyle}"
                                    ToolTip="{Binding CurrentSourceText}" />
                       </StackPanel>
                     </Border>
-                    <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}">
+                    <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="232">
                       <StackPanel>
-                        <TextBlock Text="Available Hash" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBlock Text="{Binding Text.AvailableHash}" Style="{StaticResource FieldLabelTextStyle}" />
                         <TextBlock Text="{Binding AvailableGridHashText}"
                                    Margin="0,10,0,0"
                                    Style="{StaticResource HashTextStyle}"
                                    ToolTip="{Binding AvailableGridHashText}" />
                       </StackPanel>
                     </Border>
-                    <Border Grid.Column="4" Style="{StaticResource CardBorderStyle}">
+                    <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="232">
                       <StackPanel>
-                        <TextBlock Text="Installed Hash" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBlock Text="{Binding Text.InstalledHash}" Style="{StaticResource FieldLabelTextStyle}" />
                         <TextBlock Text="{Binding InstalledGridHashText}"
                                    Margin="0,10,0,0"
                                    Style="{StaticResource HashTextStyle}"
                                    ToolTip="{Binding InstalledGridHashText}" />
                       </StackPanel>
                     </Border>
-                    <Border Grid.Column="6" Style="{StaticResource CardBorderStyle}">
+                    <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="232">
                       <StackPanel>
-                        <TextBlock Text="Selected Grid Path" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBlock Text="{Binding Text.SelectedGridPath}" Style="{StaticResource FieldLabelTextStyle}" />
                         <TextBlock Text="{Binding SelectedAccountPathText}"
                                    Margin="0,10,0,0"
                                    Style="{StaticResource PathTextStyle}"
                                    ToolTip="{Binding SelectedAccountPathText}" />
                       </StackPanel>
                     </Border>
-                  </Grid>
+                  </WrapPanel>
                 </Grid>
               </Border>
 
@@ -333,7 +312,7 @@
                   </Style>
                 </Border.Style>
                 <StackPanel>
-                  <TextBlock Text="Attention Required" Style="{StaticResource SectionTitleTextStyle}" />
+                  <TextBlock Text="{Binding Text.AttentionRequired}" Style="{StaticResource SectionTitleTextStyle}" />
                   <TextBlock Text="{Binding InitializationWarning}" Margin="0,10,0,0" Style="{StaticResource HelperTextStyle}" />
                 </StackPanel>
               </Border>
@@ -357,17 +336,8 @@
                          Margin="0,10,0,0"
                          Style="{StaticResource HelperTextStyle}" />
 
-              <Grid Margin="0,22,0,0">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="12" />
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="12" />
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="12" />
-                  <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
+              <WrapPanel Margin="0,22,0,4" ItemWidth="236">
+                <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="220">
                   <StackPanel>
                     <TextBlock Text="Source" Style="{StaticResource FieldLabelTextStyle}" />
                     <TextBlock Text="{Binding CurrentSourceText}"
@@ -376,11 +346,15 @@
                                ToolTip="{Binding CurrentSourceText}" />
                   </StackPanel>
                 </Border>
-                <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
+                <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="220">
                   <StackPanel>
                     <TextBlock Text="Hashes" Style="{StaticResource FieldLabelTextStyle}" />
-                    <TextBlock Text="{Binding AvailableGridHashText, StringFormat=Available: {0}}"
+                    <TextBlock Text="{Binding BaseGridHashText, StringFormat=Base: {0}}"
                                Margin="0,10,0,0"
+                               Style="{StaticResource HashTextStyle}"
+                               ToolTip="{Binding BaseGridHashText}" />
+                    <TextBlock Text="{Binding AvailableGridHashText, StringFormat=Available: {0}}"
+                               Margin="0,8,0,0"
                                Style="{StaticResource HashTextStyle}"
                                ToolTip="{Binding AvailableGridHashText}" />
                     <TextBlock Text="{Binding InstalledGridHashText, StringFormat=Installed: {0}}"
@@ -394,19 +368,19 @@
                                ToolTip="{Binding CachedGridHashText}" />
                   </StackPanel>
                 </Border>
-                <Border Grid.Column="4" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
+                <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="220">
                   <StackPanel>
                     <TextBlock Text="{Binding HeroCountLabel}" Style="{StaticResource FieldLabelTextStyle}" />
                     <TextBlock Text="{Binding HeroCountText}" Margin="0,10,0,0" Style="{StaticResource ValueTextStyle}" FontSize="24" />
                   </StackPanel>
                 </Border>
-                <Border Grid.Column="6" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
+                <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="220">
                   <StackPanel>
                     <TextBlock Text="Criteria" Style="{StaticResource FieldLabelTextStyle}" />
                     <TextBlock Text="{Binding GridCriteriaText}" Margin="0,10,0,0" Style="{StaticResource HelperTextStyle}" />
                   </StackPanel>
                 </Border>
-              </Grid>
+              </WrapPanel>
 
               <Border Style="{StaticResource CardBorderStyle}" Margin="0,8,0,0">
                 <StackPanel>
@@ -414,6 +388,34 @@
                   <TextBlock Text="{Binding CurrentGridPreviewSubtitle}"
                              Margin="0,8,0,0"
                              Style="{StaticResource HelperTextStyle}" />
+
+                  <Border Style="{StaticResource CardBorderStyle}" Margin="0,18,0,0">
+                    <StackPanel>
+                      <TextBlock Text="Personalization" Style="{StaticResource SectionTitleTextStyle}" />
+                      <TextBlock Text="{Binding PersonalizationStatusText}" Margin="0,10,0,0" Style="{StaticResource ValueTextStyle}" />
+                      <TextBlock Text="{Binding PersonalizationConnectedAccountText}" Margin="0,8,0,0" Style="{StaticResource HelperTextStyle}" />
+                      <TextBlock Text="{Binding PersonalizationLastRefreshText, StringFormat=Last refresh: {0}}" Margin="0,8,0,0" Style="{StaticResource HelperTextStyle}" />
+                      <TextBlock Text="{Binding PersonalizationDetailsText}" Margin="0,8,0,0" Style="{StaticResource HelperTextStyle}" TextWrapping="Wrap" />
+
+                      <ItemsControl ItemsSource="{Binding PersonalHeroPreviewItems}" Margin="0,12,0,0">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <WrapPanel />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="180" MaxWidth="220">
+                              <StackPanel>
+                                <TextBlock Text="{Binding HeroName}" Style="{StaticResource SectionTitleTextStyle}" FontSize="16" />
+                                <TextBlock Text="{Binding StatLine}" Margin="0,8,0,0" Style="{StaticResource HelperTextStyle}" />
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
 
                   <ListBox ItemsSource="{Binding GridPreviewLayouts}"
                            SelectedItem="{Binding SelectedGridPreviewLayout}"
@@ -429,7 +431,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate>
-                        <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" Width="250" Padding="16">
+                        <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,12,12" MinWidth="250" MaxWidth="320" Padding="16">
                           <StackPanel>
                             <TextBlock Text="{Binding Name}" Style="{StaticResource SectionTitleTextStyle}" FontSize="16" />
                             <TextBlock Text="{Binding HeroCountText}"
@@ -469,9 +471,9 @@
                   <ColumnDefinition Width="*" />
                   <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="Steam Accounts" Style="{StaticResource PageTitleTextStyle}" FontSize="28" />
+                <TextBlock Text="{Binding Text.SteamAccounts}" Style="{StaticResource PageTitleTextStyle}" FontSize="28" />
                 <Button Grid.Column="1"
-                        Content="Re-detect Steam"
+                        Content="{Binding Text.RedetectSteam}"
                         Style="{StaticResource CompactActionButtonStyle}"
                         Command="{Binding DetectSteamCommand}" />
               </Grid>
@@ -496,13 +498,17 @@
                               <Border.Style>
                                 <Style TargetType="Border" BasedOn="{StaticResource StatusChipBorderStyle}">
                                   <Style.Triggers>
-                                    <DataTrigger Binding="{Binding GridConfigStatus}" Value="Grid Ready">
+                                    <DataTrigger Binding="{Binding GridState}" Value="Present">
                                       <Setter Property="Background" Value="{StaticResource SuccessSurfaceBrush}" />
                                       <Setter Property="BorderBrush" Value="#355340" />
                                     </DataTrigger>
-                                    <DataTrigger Binding="{Binding GridConfigStatus}" Value="No Grid Yet">
+                                    <DataTrigger Binding="{Binding GridState}" Value="NoManagedGrid">
                                       <Setter Property="Background" Value="{StaticResource WarningSurfaceBrush}" />
                                       <Setter Property="BorderBrush" Value="#5A4727" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding GridState}" Value="MalformedFile">
+                                      <Setter Property="Background" Value="{StaticResource DangerSurfaceBrush}" />
+                                      <Setter Property="BorderBrush" Value="#5B3538" />
                                     </DataTrigger>
                                   </Style.Triggers>
                                 </Style>
@@ -512,14 +518,14 @@
                           </WrapPanel>
                           <TextBlock Text="{Binding GridConfigDetail}" Margin="0,4,0,0" Style="{StaticResource MetadataTextStyle}" />
                           <StackPanel Margin="0,12,0,0">
-                            <TextBlock Text="Detected MetaGrid Hash" Style="{StaticResource FieldLabelTextStyle}" />
+                            <TextBlock Text="{Binding DataContext.Text.DetectedMetaGridHash, RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource FieldLabelTextStyle}" />
                             <TextBlock Text="{Binding CurrentGridHash}"
                                        Margin="0,6,0,0"
                                        Style="{StaticResource HashTextStyle}"
                                        ToolTip="{Binding Model.CurrentMetaGridHash}" />
                           </StackPanel>
                           <StackPanel Margin="0,12,0,0">
-                            <TextBlock Text="Config Path" Style="{StaticResource FieldLabelTextStyle}" />
+                            <TextBlock Text="{Binding DataContext.Text.ConfigPath, RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource FieldLabelTextStyle}" />
                             <TextBlock Text="{Binding ConfigPath}"
                                        Margin="0,6,0,0"
                                        Style="{StaticResource PathTextStyle}"
@@ -557,9 +563,9 @@
                   <ColumnDefinition Width="*" />
                   <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="Update History" Style="{StaticResource PageTitleTextStyle}" FontSize="28" />
+                <TextBlock Text="{Binding Text.UpdateHistory}" Style="{StaticResource PageTitleTextStyle}" FontSize="28" />
                 <Button Grid.Column="1"
-                        Content="Clear History"
+                        Content="{Binding Text.ClearHistory}"
                         Style="{StaticResource DestructiveButtonStyle}"
                         Command="{Binding ClearHistoryCommand}" />
               </Grid>
@@ -611,14 +617,14 @@
                             <RowDefinition Height="Auto" />
                           </Grid.RowDefinitions>
 
-                          <TextBlock Text="Previous Hash" Style="{StaticResource FieldLabelTextStyle}" Margin="0,0,12,0" />
+                          <TextBlock Text="{Binding DataContext.Text.PreviousHash, RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource FieldLabelTextStyle}" Margin="0,0,12,0" />
                           <TextBlock Grid.Column="1"
                                      Text="{Binding PreviousHash}"
                                      Style="{StaticResource HashTextStyle}"
                                      MaxWidth="320"
                                      ToolTip="{Binding PreviousHash}" />
 
-                          <TextBlock Grid.Row="1" Text="New Hash" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,12,0" />
+                          <TextBlock Grid.Row="1" Text="{Binding DataContext.Text.NewHash, RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,12,0" />
                           <TextBlock Grid.Row="1"
                                      Grid.Column="1"
                                      Text="{Binding NewHash}"
@@ -627,7 +633,7 @@
                                      MaxWidth="320"
                                      ToolTip="{Binding NewHash}" />
 
-                          <TextBlock Grid.Row="2" Text="Changed Heroes" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,12,0" />
+                          <TextBlock Grid.Row="2" Text="{Binding DataContext.Text.ChangedHeroes, RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,12,0" />
                           <TextBlock Grid.Row="2"
                                      Grid.Column="1"
                                      Text="{Binding ChangedHeroCount}"
@@ -660,7 +666,7 @@
                          Style="{StaticResource HelperTextStyle}" />
 
               <Border Style="{StaticResource CardBorderStyle}" Margin="0,22,0,0">
-                <StackPanel MaxWidth="860" HorizontalAlignment="Center">
+                <StackPanel MaxWidth="1080" HorizontalAlignment="Stretch">
                   <TextBlock Text="General" Style="{StaticResource SectionTitleTextStyle}" />
                   <CheckBox Content="Launch with Windows" Style="{StaticResource SettingsToggleRowStyle}" IsChecked="{Binding EditableSettings.LaunchWithWindows}" />
                   <CheckBox Content="Start minimized" Style="{StaticResource SettingsToggleRowStyle}" IsChecked="{Binding EditableSettings.StartMinimized}" />
@@ -670,10 +676,17 @@
               </Border>
 
               <Border Style="{StaticResource CardBorderStyle}" Margin="0,16,0,0">
-                <StackPanel MaxWidth="860" HorizontalAlignment="Center">
+                <StackPanel MaxWidth="1080" HorizontalAlignment="Stretch">
                   <TextBlock Text="Updates" Style="{StaticResource SectionTitleTextStyle}" />
                   <CheckBox Content="Automatic updates" Style="{StaticResource SettingsToggleRowStyle}" IsChecked="{Binding EditableSettings.AutoUpdateEnabled}" />
                   <TextBlock Text="Automatically check, download, validate, and install new official Dota2ProTracker High Winrate hero-grid updates."
+                             Style="{StaticResource HelperTextStyle}"
+                             Margin="0,4,0,0"
+                             TextWrapping="Wrap" />
+                  <CheckBox Content="Check for MetaGrid app updates automatically"
+                            Style="{StaticResource SettingsToggleRowStyle}"
+                            IsChecked="{Binding EditableSettings.AutomaticallyCheckAppUpdates}" />
+                  <TextBlock Text="This controls GitHub Releases checks for newer MetaGrid builds and stays separate from Dota hero-grid update scheduling."
                              Style="{StaticResource HelperTextStyle}"
                              Margin="0,4,0,0"
                              TextWrapping="Wrap" />
@@ -699,7 +712,7 @@
               </Border>
 
               <Border Style="{StaticResource CardBorderStyle}" Margin="0,16,0,0">
-                <StackPanel MaxWidth="860" HorizontalAlignment="Center">
+                <StackPanel MaxWidth="1080" HorizontalAlignment="Stretch">
                   <TextBlock Text="Steam and Advanced" Style="{StaticResource SectionTitleTextStyle}" />
                   <CheckBox Content="Automatically detect Steam" Style="{StaticResource SettingsToggleRowStyle}" IsChecked="{Binding EditableSettings.AutomaticallyDetectSteam}" />
                   <TextBlock Text="Manual Steam Directory Override" Style="{StaticResource FieldLabelTextStyle}" />
@@ -729,7 +742,93 @@
               </Border>
 
               <Border Style="{StaticResource CardBorderStyle}" Margin="0,16,0,0">
-                <Grid MaxWidth="860" HorizontalAlignment="Center">
+                <StackPanel MaxWidth="1080" HorizontalAlignment="Stretch">
+                  <TextBlock Text="Personal Hero Recommendations" Style="{StaticResource SectionTitleTextStyle}" />
+                  <CheckBox Content="Enable personal hero row"
+                            Style="{StaticResource SettingsToggleRowStyle}"
+                            IsChecked="{Binding EditableSettings.PersonalizationEnabled}" />
+                  <TextBlock Text="Player Source" Style="{StaticResource FieldLabelTextStyle}" />
+                  <ComboBox ItemsSource="{Binding PersonalizationSourceOptions}"
+                            SelectedValuePath="Value"
+                            DisplayMemberPath="Label"
+                            SelectedValue="{Binding EditableSettings.PersonalizationAccountSourceMode}"
+                            Margin="0,8,0,0"
+                            MinWidth="280"
+                            MaxWidth="340"
+                            HorizontalAlignment="Left" />
+                  <TextBlock Text="{Binding PersonalizationSourceText}"
+                             Margin="0,10,0,0"
+                             Style="{StaticResource ValueTextStyle}" />
+                  <TextBlock Text="{Binding PersonalizationConnectedAccountText}"
+                             Margin="0,8,0,0"
+                             Style="{StaticResource HelperTextStyle}"
+                             TextWrapping="Wrap" />
+                  <TextBlock Text="OpenDota automatically uses your selected Steam account when Selected Steam account mode is active."
+                             Margin="0,8,0,0"
+                             Style="{StaticResource HelperTextStyle}"
+                             TextWrapping="Wrap" />
+
+                  <Border Margin="0,16,0,0">
+                    <Border.Style>
+                      <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding EditableSettings.PersonalizationAccountSourceMode}" Value="ManualAccount">
+                            <Setter Property="Visibility" Value="Visible" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Border.Style>
+                    <StackPanel>
+                      <TextBlock Text="Advanced / Manual Override" Style="{StaticResource FieldLabelTextStyle}" />
+                      <TextBox Text="{Binding PersonalizationInput, UpdateSourceTrigger=PropertyChanged}"
+                               Margin="0,8,0,0"
+                               ToolTip="OpenDota URL, Dotabuff player URL, or numeric account ID" />
+                      <TextBlock Text="Dotabuff URLs are accepted only to extract the numeric player ID. MetaGrid does not scrape Dotabuff stats or require a login."
+                                 Margin="0,8,0,0"
+                                 Style="{StaticResource HelperTextStyle}"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+
+                  <WrapPanel Margin="0,16,0,0">
+                    <Button Content="Connect"
+                            Command="{Binding ConnectPersonalizationCommand}"
+                            MinWidth="128"
+                            Margin="0,0,10,10">
+                      <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+                          <Setter Property="Visibility" Value="Collapsed" />
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding EditableSettings.PersonalizationAccountSourceMode}" Value="ManualAccount">
+                              <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Button.Style>
+                    </Button>
+                    <Button Content="Refresh Personal Heroes"
+                            Style="{StaticResource CompactActionButtonStyle}"
+                            Command="{Binding RefreshPersonalHeroesCommand}"
+                            Margin="0,0,10,10" />
+                    <Button Content="Disconnect"
+                            Style="{StaticResource CompactActionButtonStyle}"
+                            Command="{Binding DisconnectPersonalizationCommand}"
+                            Margin="0,0,0,10" />
+                  </WrapPanel>
+
+                  <TextBlock Text="{Binding PersonalizationStatusText}" Margin="0,8,0,0" Style="{StaticResource ValueTextStyle}" />
+                  <TextBlock Text="{Binding PersonalizationLastRefreshText, StringFormat=Last personal stats refresh: {0}}" Margin="0,8,0,0" Style="{StaticResource HelperTextStyle}" />
+                  <TextBlock Text="{Binding PersonalizationDetailsText}" Margin="0,8,0,0" Style="{StaticResource HelperTextStyle}" TextWrapping="Wrap" />
+                  <TextBlock Text="Rules: last 90 days, at least 10 matches, at least 53% win rate, maximum 7 heroes."
+                             Margin="0,12,0,0"
+                             Style="{StaticResource HelperTextStyle}"
+                             TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+
+              <Border Style="{StaticResource CardBorderStyle}" Margin="0,16,0,0">
+                <Grid MaxWidth="1080" HorizontalAlignment="Stretch">
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -767,6 +866,49 @@
             </Border.Style>
             <StackPanel>
               <TextBlock Text="About MetaGrid" Style="{StaticResource PageTitleTextStyle}" FontSize="28" />
+              <Border Style="{StaticResource CardBorderStyle}" Margin="0,18,0,0">
+                <StackPanel>
+                  <TextBlock Text="Application Updates" Style="{StaticResource SectionTitleTextStyle}" />
+                  <WrapPanel Margin="0,16,0,10">
+                    <Border Style="{StaticResource StatusChipBorderStyle}">
+                      <TextBlock Text="{Binding AppUpdateChipText}" Style="{StaticResource StatusChipTextStyle}" />
+                    </Border>
+                    <Border Style="{StaticResource StatusChipSuccessBorderStyle}">
+                      <TextBlock Text="{Binding CurrentAppVersionText, StringFormat=Current {0}}" Style="{StaticResource StatusChipTextStyle}" />
+                    </Border>
+                    <Border Style="{StaticResource StatusChipBorderStyle}">
+                      <TextBlock Text="{Binding AppUpdateAvailableVersionText, StringFormat=Latest {0}}" Style="{StaticResource StatusChipTextStyle}" />
+                    </Border>
+                  </WrapPanel>
+                  <TextBlock Text="{Binding AppUpdateStatusTitle}" Style="{StaticResource ValueTextStyle}" FontSize="24" />
+                  <TextBlock Text="{Binding AppUpdateStatusText}"
+                             Margin="0,10,0,0"
+                             Style="{StaticResource HelperTextStyle}"
+                             TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding AppUpdateLastCheckedText, StringFormat=Last checked: {0}}"
+                             Margin="0,12,0,0"
+                             Style="{StaticResource HelperTextStyle}" />
+                  <WrapPanel Margin="0,18,0,0">
+                    <Button Content="{Binding CheckAppUpdatesLabel}"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Command="{Binding CheckAppUpdatesCommand}"
+                            MinWidth="180"
+                            Margin="0,0,12,12" />
+                    <Button Content="{Binding UpdateNowLabel}"
+                            Style="{StaticResource CompactActionButtonStyle}"
+                            Command="{Binding InstallAppUpdateCommand}"
+                            Visibility="{Binding HasAppUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}"
+                            MinWidth="132"
+                            Margin="0,0,12,12" />
+                    <Button Content="{Binding LaterLabel}"
+                            Style="{StaticResource CompactActionButtonStyle}"
+                            Command="{Binding LaterAppUpdateCommand}"
+                            Visibility="{Binding HasAppUpdateAvailable, Converter={StaticResource BoolToVisibilityConverter}}"
+                            MinWidth="92"
+                            Margin="0,0,0,12" />
+                  </WrapPanel>
+                </StackPanel>
+              </Border>
               <Border Style="{StaticResource CardBorderStyle}" Margin="0,18,0,0">
                 <StackPanel>
                   <TextBlock Text="MetaGrid is an independent Windows utility for keeping a Dota 2 hero grid synchronized with current public match statistics while preserving user-managed grids."
@@ -826,7 +968,7 @@
                            HorizontalAlignment="Center" />
                 <WrapPanel Margin="0,24,0,0" HorizontalAlignment="Center">
                   <Border Style="{StaticResource StatusChipBorderStyle}">
-                    <TextBlock Text="{Binding OnboardingStep, StringFormat=Step {0} of 5}" Style="{StaticResource StatusChipTextStyle}" />
+                    <TextBlock Text="{Binding OnboardingStepLabel}" Style="{StaticResource StatusChipTextStyle}" />
                   </Border>
                   <Border Style="{StaticResource StatusChipBorderStyle}">
                     <TextBlock Text="{Binding AutoUpdateChipText}" Style="{StaticResource StatusChipTextStyle}" />
@@ -867,10 +1009,10 @@
                                TextWrapping="Wrap"
                                TextAlignment="Center"
                                HorizontalAlignment="Center" />
-                    <CheckBox Content="Automatically detect Steam" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,16" IsChecked="{Binding Settings.AutomaticallyDetectSteam}" />
-                    <TextBlock Text="Manual Steam directory" Style="{StaticResource FieldLabelTextStyle}" />
+                    <CheckBox Content="{Binding Text.AutomaticDetectSteam}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,16" IsChecked="{Binding Settings.AutomaticallyDetectSteam}" />
+                    <TextBlock Text="{Binding Text.ManualSteamDirectory}" Style="{StaticResource FieldLabelTextStyle}" />
                     <TextBox Text="{Binding Settings.SteamDirectoryOverride}" Margin="0,8,0,0" />
-                    <Button Content="Detect Steam Again"
+                    <Button Content="{Binding Text.DetectSteamAgain}"
                             Style="{StaticResource CompactActionButtonStyle}"
                             Command="{Binding DetectSteamCommand}"
                             Margin="0,16,0,0"
@@ -880,7 +1022,7 @@
 
                 <Border Style="{StaticResource CardBorderStyle}" Visibility="{Binding IsOnboardingAccountsStep, Converter={StaticResource BoolToVisibilityConverter}}">
                   <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="{Binding SelectedAccountText, StringFormat=Selected account: {0}}"
+                    <TextBlock Text="{Binding OnboardingSelectedAccountLabel}"
                                Style="{StaticResource SectionTitleTextStyle}"
                                MaxWidth="400"
                                TextWrapping="Wrap"
@@ -892,7 +1034,7 @@
                                TextWrapping="Wrap"
                                HorizontalAlignment="Left"
                                Width="400" />
-                    <TextBlock Text="If you have multiple valid Dota accounts, you can fine-tune the selection later on the Accounts page."
+                    <TextBlock Text="{Binding OnboardingAccountsHintText}"
                                Margin="0,14,0,0"
                                MaxWidth="400"
                                Foreground="{StaticResource SecondaryBrush}"
@@ -904,15 +1046,15 @@
 
                 <Border Style="{StaticResource CardBorderStyle}" Visibility="{Binding IsOnboardingAutoUpdateStep, Converter={StaticResource BoolToVisibilityConverter}}">
                   <StackPanel>
-                    <CheckBox Content="Enable automatic updates" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,16" IsChecked="{Binding Settings.AutoUpdateEnabled}" />
-                    <TextBlock Text="When enabled, MetaGrid checks Dota2ProTracker on schedule and safely installs a new grid automatically only when the validated semantic hash changes."
+                    <CheckBox Content="{Binding Text.EnableAutomaticUpdates}" Style="{StaticResource ToggleSwitchStyle}" Margin="0,0,0,16" IsChecked="{Binding Settings.AutoUpdateEnabled}" />
+                    <TextBlock Text="{Binding OnboardingAutoUpdateHelpText}"
                                Style="{StaticResource HelperTextStyle}"
                                Margin="0,0,0,12"
                                TextWrapping="Wrap"
                                TextAlignment="Center"
                                HorizontalAlignment="Center"
                                MaxWidth="420" />
-                    <TextBlock Text="Update interval" Style="{StaticResource FieldLabelTextStyle}" />
+                    <TextBlock Text="{Binding Text.UpdateInterval}" Style="{StaticResource FieldLabelTextStyle}" />
                     <ComboBox MinWidth="220"
                               MaxWidth="280"
                               ItemsSource="{Binding UpdateIntervalOptions}"
@@ -926,7 +1068,7 @@
 
                 <Border Style="{StaticResource CardBorderStyle}" Visibility="{Binding IsOnboardingReadyStep, Converter={StaticResource BoolToVisibilityConverter}}">
                   <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="Setup Summary"
+                    <TextBlock Text="{Binding Text.SetupSummary}"
                                Style="{StaticResource SectionTitleTextStyle}"
                                TextAlignment="Center"
                                HorizontalAlignment="Center" />
@@ -948,7 +1090,7 @@
                           Command="{Binding NextOnboardingCommand}"
                           MinWidth="136"
                           Margin="0,0,12,12" />
-                  <Button Content="Finish Setup"
+                  <Button Content="{Binding Text.FinishSetup}"
                           Command="{Binding FinishOnboardingCommand}"
                           Visibility="{Binding ShowFinishOnboardingButton, Converter={StaticResource BoolToVisibilityConverter}}"
                           MinWidth="136"

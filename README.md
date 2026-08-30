@@ -42,12 +42,15 @@ Configure automatic updates, update intervals, backup retention, Windows startup
 - Scheduled automatic updates
 - Manual `Check for Updates` and `Force Refresh`
 - `Install Grid` / `Update Grid` workflow
+- Built-in MetaGrid application updates through GitHub Releases starting with v0.1.1
 - Steam installation and account detection
 - Selected Steam account support
 - Safe backup before MetaGrid-managed changes
 - Backup restore from inside the app
 - Update history and latest-grid status tracking
 - System tray support
+- Optional MY BEST HEROES personalization using OpenDota statistics
+- English and Russian interface support
 - Preservation of unrelated custom layouts where supported
 
 ## How It Works
@@ -68,7 +71,7 @@ MetaGrid follows a simple user-facing workflow:
 - Internet connection for Dota2ProTracker updates
 - Microsoft Edge WebView2 Runtime
 
-The distributed v0.1.0 Windows build is self-contained with respect to .NET, so a separate .NET Desktop Runtime installation is not required for the packaged release.
+The distributed Windows release is self-contained with respect to .NET, so a separate .NET Desktop Runtime installation is not required for the packaged release.
 
 ## Installation
 
@@ -76,6 +79,9 @@ The distributed v0.1.0 Windows build is self-contained with respect to .NET, so 
 2. Extract the ZIP.
 3. Open the extracted `MetaGrid` folder.
 4. Run `MetaGrid.exe`.
+
+If you are currently on MetaGrid v0.1.0, manually install v0.1.1 once from the release ZIP.
+Starting with v0.1.1, future compatible MetaGrid application updates can be installed from inside the app.
 
 ## Usage
 

@@ -115,6 +115,43 @@ public sealed class SettingsService(IAppPaths appPaths, ILoggingService loggingS
         settings.SelectedAccountIds ??= [];
         settings.BackupRetentionCount = Math.Clamp(settings.BackupRetentionCount, 1, 50);
         settings.LastRoleSummary ??= string.Empty;
+        settings.LastAppUpdateState ??= AppUpdateCheckState.Unknown.ToString();
+        settings.LastAppUpdateMessage ??= string.Empty;
+        settings.LastAvailableAppVersion = string.IsNullOrWhiteSpace(settings.LastAvailableAppVersion)
+            ? null
+            : settings.LastAvailableAppVersion.Trim();
+        settings.DeferredAppUpdateVersion = string.IsNullOrWhiteSpace(settings.DeferredAppUpdateVersion)
+            ? null
+            : settings.DeferredAppUpdateVersion.Trim();
+        if (settings.DeferredAppUpdateUntil <= DateTimeOffset.MinValue)
+        {
+            settings.DeferredAppUpdateUntil = null;
+        }
+
+        settings.PersonalizationAccountId = string.IsNullOrWhiteSpace(settings.PersonalizationAccountId)
+            ? null
+            : settings.PersonalizationAccountId.Trim();
+        settings.PersonalizationManualAccountId = string.IsNullOrWhiteSpace(settings.PersonalizationManualAccountId)
+            ? null
+            : settings.PersonalizationManualAccountId.Trim();
+        if (settings.PersonalizationAccountSourceMode == PersonalizationAccountSourceMode.ManualAccount
+            && string.IsNullOrWhiteSpace(settings.PersonalizationManualAccountId)
+            && !string.IsNullOrWhiteSpace(settings.PersonalizationAccountId))
+        {
+            settings.PersonalizationManualAccountId = settings.PersonalizationAccountId;
+        }
+
+        if (settings.PersonalizationAccountSourceMode == PersonalizationAccountSourceMode.SelectedSteamAccount)
+        {
+            settings.PersonalizationManualAccountId = null;
+        }
+
+        settings.LastPersonalizationMessage ??= string.Empty;
+        settings.LastPersonalizationStatus ??= settings.PersonalizationEnabled && !string.IsNullOrWhiteSpace(settings.PersonalizationAccountId)
+            ? PersonalizationStatus.ProfileUnavailable.ToString()
+            : PersonalizationStatus.Disabled.ToString();
+        settings.LastBaseSourceHash ??= settings.LastRemoteHash;
+        settings.LastEffectiveGridHash ??= settings.LastRemoteHash;
         return settings;
     }
 }

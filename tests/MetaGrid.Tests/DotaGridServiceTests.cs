@@ -96,6 +96,85 @@ public sealed class DotaGridServiceTests
     }
 
     [Fact]
+    public async Task InspectInstalledMetaGridAsync_ReturnsMissingFile_WhenConfigDoesNotExist()
+    {
+        using var temp = new TemporaryDirectory();
+        var service = new DotaGridService();
+
+        var result = await service.InspectInstalledMetaGridAsync(Path.Combine(temp.Path, "missing.json"), CancellationToken.None);
+
+        Assert.Equal(InstalledMetaGridState.MissingFile, result.State);
+        Assert.Null(result.InstalledHash);
+    }
+
+    [Fact]
+    public async Task InspectInstalledMetaGridAsync_ReturnsMalformedFile_WhenJsonCannotBeParsed()
+    {
+        using var temp = new TemporaryDirectory();
+        var service = new DotaGridService();
+        var configPath = Path.Combine(temp.Path, "hero_grid_config.json");
+        await File.WriteAllTextAsync(configPath, "{ invalid json");
+
+        var result = await service.InspectInstalledMetaGridAsync(configPath, CancellationToken.None);
+
+        Assert.Equal(InstalledMetaGridState.MalformedFile, result.State);
+        Assert.Null(result.InstalledHash);
+        Assert.False(string.IsNullOrWhiteSpace(result.Error));
+    }
+
+    [Fact]
+    public async Task InspectInstalledMetaGridAsync_ReturnsNoManagedGrid_WhenOnlyCustomLayoutsExist()
+    {
+        using var temp = new TemporaryDirectory();
+        var service = new DotaGridService();
+        var configPath = Path.Combine(temp.Path, "hero_grid_config.json");
+        var file = new DotaHeroGridFile
+        {
+            Configs =
+            [
+                new DotaHeroGridLayout
+                {
+                    ConfigName = "Custom Layout",
+                    Categories =
+                    [
+                        new DotaHeroGridCategory
+                        {
+                            CategoryName = "Favorites",
+                            HeroIds = [1, 2, 3],
+                            XPosition = 0,
+                            YPosition = 0,
+                            Width = 100,
+                            Height = 100
+                        }
+                    ]
+                }
+            ]
+        };
+        await File.WriteAllTextAsync(configPath, service.Serialize(file));
+
+        var result = await service.InspectInstalledMetaGridAsync(configPath, CancellationToken.None);
+
+        Assert.Equal(InstalledMetaGridState.NoManagedGrid, result.State);
+        Assert.Null(result.InstalledHash);
+    }
+
+    [Fact]
+    public async Task InspectInstalledMetaGridAsync_ReturnsPresent_WhenManagedGridExists()
+    {
+        using var temp = new TemporaryDirectory();
+        var service = new DotaGridService();
+        var configPath = Path.Combine(temp.Path, "hero_grid_config.json");
+        var snapshot = StubProvider.CreateSnapshot([1, 2, 3, 4, 5]);
+        await File.WriteAllTextAsync(configPath, service.Serialize(service.ApplySnapshot(new DotaHeroGridFile(), snapshot)));
+
+        var result = await service.InspectInstalledMetaGridAsync(configPath, CancellationToken.None);
+
+        Assert.Equal(InstalledMetaGridState.Present, result.State);
+        Assert.Equal(service.ComputeSnapshotHash(snapshot), result.InstalledHash);
+        Assert.True(result.ManagedLayoutCount > 0);
+    }
+
+    [Fact]
     public void TryValidate_ReturnsFalse_ForMalformedJson()
     {
         var service = new DotaGridService();
@@ -261,5 +340,144 @@ public sealed class DotaGridServiceTests
         var installedHash = await service.ReadInstalledMetaGridHashAsync(configPath, CancellationToken.None);
 
         Assert.Equal(validation.SemanticHash, installedHash);
+    }
+
+    [Fact]
+    public async Task Parse_DotaNativeTestFixture_Succeeds_And_Test_Is_Stored_As_Configs_Array_Element()
+    {
+        var service = new DotaGridService();
+        var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "dota_native_test_grid.json");
+
+        var json = await File.ReadAllTextAsync(path);
+        Assert.True(service.TryValidate(json, out _));
+
+        using var document = JsonDocument.Parse(json);
+        var configs = document.RootElement.GetProperty("configs");
+        Assert.Equal(JsonValueKind.Array, configs.ValueKind);
+        var test = configs.EnumerateArray().Single(item => item.GetProperty("config_name").GetString() == "TEST");
+        Assert.True(test.TryGetProperty("categories", out var categories));
+        Assert.Equal(JsonValueKind.Array, categories.ValueKind);
+
+        var model = JsonSerializer.Deserialize<DotaHeroGridFile>(json)!;
+        var validation = service.ValidateNativeStructure(model);
+        Assert.True(validation.IsValid, validation.Error);
+        Assert.Single(model.Configs);
+        Assert.Equal("TEST", model.Configs[0].ConfigName);
+    }
+
+    [Fact]
+    public async Task ApplySnapshot_Preserves_DotaNative_Test_Grid_Unchanged()
+    {
+        var service = new DotaGridService();
+        var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "dota_native_test_grid.json");
+        var originalJson = await File.ReadAllTextAsync(path);
+        var original = JsonSerializer.Deserialize<DotaHeroGridFile>(originalJson)!;
+        var merged = service.ApplySnapshot(original, StubProvider.CreateSnapshot(Enumerable.Range(1, 55).ToArray()));
+
+        var test = merged.Configs.Single(config => config.ConfigName == "TEST");
+        var sourceTest = JsonSerializer.Deserialize<DotaHeroGridFile>(originalJson)!.Configs.Single(config => config.ConfigName == "TEST");
+
+        Assert.Equal(sourceTest.Categories.Count, test.Categories.Count);
+        Assert.Equal(
+            sourceTest.Categories.Select(category => $"{category.CategoryName}:{category.XPosition}:{category.YPosition}:{category.Width}:{category.Height}:{string.Join(",", category.HeroIds)}"),
+            test.Categories.Select(category => $"{category.CategoryName}:{category.XPosition}:{category.YPosition}:{category.Width}:{category.Height}:{string.Join(",", category.HeroIds)}"));
+    }
+
+    [Fact]
+    public async Task ApplySnapshot_With_DotaNative_Test_Grid_Produces_Unique_Config_Names_And_Valid_Native_Structure()
+    {
+        var service = new DotaGridService();
+        var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "dota_native_test_grid.json");
+        var original = JsonSerializer.Deserialize<DotaHeroGridFile>(await File.ReadAllTextAsync(path))!;
+        var personalized = service.ApplySnapshot(original, StubProvider.CreateSnapshot(Enumerable.Range(1, 55).ToArray(), sourceName: "Dota2ProTracker"));
+
+        var validation = service.ValidateNativeStructure(personalized);
+
+        Assert.True(validation.IsValid, validation.Error);
+        Assert.Equal(personalized.Configs.Count, personalized.Configs.Select(config => config.ConfigName).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Contains(personalized.Configs, config => config.ConfigName == "TEST");
+        Assert.Equal(2, personalized.Configs.Count);
+    }
+
+    [Fact]
+    public void ValidateNativeStructure_Fails_When_ConfigNames_Are_Duplicated()
+    {
+        var service = new DotaGridService();
+        var file = new DotaHeroGridFile
+        {
+            Configs =
+            [
+                new DotaHeroGridLayout
+                {
+                    ConfigName = "TEST",
+                    Categories =
+                    [
+                        new DotaHeroGridCategory
+                        {
+                            CategoryName = "Strength",
+                            XPosition = 0,
+                            YPosition = 0,
+                            Width = 100,
+                            Height = 100,
+                            HeroIds = [1]
+                        }
+                    ]
+                },
+                new DotaHeroGridLayout
+                {
+                    ConfigName = "TEST",
+                    Categories =
+                    [
+                        new DotaHeroGridCategory
+                        {
+                            CategoryName = "Agility",
+                            XPosition = 0,
+                            YPosition = 0,
+                            Width = 100,
+                            Height = 100,
+                            HeroIds = [2]
+                        }
+                    ]
+                }
+            ]
+        };
+
+        var validation = service.ValidateNativeStructure(file);
+
+        Assert.False(validation.IsValid);
+        Assert.Contains("Duplicate config_name", validation.Error);
+    }
+
+    [Fact]
+    public void ValidateNativeStructure_Fails_When_Category_Has_Invalid_Dimensions()
+    {
+        var service = new DotaGridService();
+        var file = new DotaHeroGridFile
+        {
+            Configs =
+            [
+                new DotaHeroGridLayout
+                {
+                    ConfigName = "TEST",
+                    Categories =
+                    [
+                        new DotaHeroGridCategory
+                        {
+                            CategoryName = "Strength",
+                            XPosition = 0,
+                            YPosition = 0,
+                            Width = 0,
+                            Height = 100,
+                            HeroIds = [1]
+                        }
+                    ]
+                }
+            ]
+        };
+
+        var validation = service.ValidateNativeStructure(file);
+
+        Assert.False(validation.IsValid);
+        Assert.Contains("invalid width/height", validation.Error);
     }
 }

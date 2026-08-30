@@ -10,10 +10,31 @@ public sealed class UpdateService(
     IBackupService backupService,
     IHistoryService historyService,
     ILoggingService loggingService,
-    IHeroCatalogService heroCatalogService) : IUpdateService
+    IHeroCatalogService heroCatalogService,
+    IPersonalizationService personalizationService,
+    IPersonalizedGridComposer personalizedGridComposer) : IUpdateService
 {
     private static readonly string[] PreferredRoleGroups = ["Carry", "Mid", "Offlane", "Support", "Hard Support", "All Roles"];
     private readonly SemaphoreSlim _updateGate = new(1, 1);
+
+    public UpdateService(
+        IHeroGridProvider provider,
+        IDotaGridService dotaGridService,
+        IBackupService backupService,
+        IHistoryService historyService,
+        ILoggingService loggingService,
+        IHeroCatalogService heroCatalogService)
+        : this(
+            provider,
+            dotaGridService,
+            backupService,
+            historyService,
+            loggingService,
+            heroCatalogService,
+            new NullPersonalizationService(),
+            new PassThroughPersonalizedGridComposer())
+    {
+    }
 
     public async Task<UpdateRunResult> CheckForUpdatesAsync(
         IReadOnlyList<SteamAccount> accounts,
@@ -30,47 +51,13 @@ public sealed class UpdateService(
                 return NoSelectedAccountResult(UpdateTriggerKind.ManualCheck);
             }
 
-            HeroGridSnapshot snapshot;
-            try
+            var fetch = await TryFetchBaseSnapshotAsync(settings, forceWrite, UpdateTriggerKind.ManualCheck, cancellationToken);
+            if (!fetch.Succeeded || fetch.BaseSnapshot is null)
             {
-                snapshot = await provider.FetchAsync(settings.PreferredPreset, cancellationToken);
+                return fetch.FailureResult!;
             }
-            catch (HeroGridProviderParseException ex)
-            {
-                await loggingService.LogAsync(LogLevelKind.Warning, "Hero grid parsing failed", new { ex.Message, forceWrite }, cancellationToken);
-                return new UpdateRunResult
-                {
-                    Status = UpdateStatus.ParsingFailed,
-                    Message = "MetaGrid reached the active data source, but the returned hero-grid data could not be parsed.",
-                    GridHash = settings.LastInstalledHash ?? string.Empty,
-                    ProviderStatus = ProviderStatus.ParsingFailed,
-                    ProviderMessage = ex.Message
-                };
-            }
-            catch (HeroGridProviderUnavailableException ex)
-            {
-                await loggingService.LogAsync(LogLevelKind.Warning, "Hero grid unavailable", new { ex.Message, ex.Status, forceWrite }, cancellationToken);
-                return new UpdateRunResult
-                {
-                    Status = UpdateStatus.SourceUnavailable,
-                    Message = "The active hero-grid data source is currently unavailable.",
-                    GridHash = settings.LastInstalledHash ?? string.Empty,
-                    ProviderStatus = ex.Status,
-                    ProviderMessage = ex.Message
-                };
-            }
-            catch (Exception ex)
-            {
-                await loggingService.LogAsync(LogLevelKind.Error, "Hero grid source unavailable", new { ex.Message, forceWrite }, cancellationToken);
-                return new UpdateRunResult
-                {
-                    Status = UpdateStatus.UnexpectedResponse,
-                    Message = "MetaGrid received an unexpected response while checking the active hero-grid data source.",
-                    GridHash = settings.LastInstalledHash ?? string.Empty,
-                    ProviderStatus = ProviderStatus.UnexpectedResponse,
-                    ProviderMessage = ex.Message
-                };
-            }
+
+            var snapshot = fetch.BaseSnapshot;
 
             await loggingService.LogAsync(LogLevelKind.Information, "Provider snapshot received for update check.", new
             {
@@ -114,34 +101,22 @@ public sealed class UpdateService(
                     snapshotValidation.Error);
             }
 
-            var changedHeroCount = CountChangedHeroes(snapshot);
+            var composition = await ComposeEffectiveSnapshotAsync(snapshot, settings, selectedAccount, forceWrite, cancellationToken);
+            var changedHeroCount = CountChangedHeroes(composition.EffectiveSnapshot);
             var currentHash = await dotaGridService.ReadInstalledMetaGridHashAsync(selectedAccount.HeroGridConfigPath, cancellationToken);
             var isLiveSnapshot = snapshot.OriginKind != GridOriginKind.Cached;
-            var hashesMatch = string.Equals(currentHash, snapshot.Hash, StringComparison.OrdinalIgnoreCase);
-            var installSnapshot = CreateInstallSnapshot(selectedAccount, snapshot);
+            var hashesMatch = string.Equals(currentHash, composition.EffectiveGridHash, StringComparison.OrdinalIgnoreCase);
+            var installSnapshot = CreateInstallSnapshot(selectedAccount, composition);
 
-            return new UpdateRunResult
-            {
-                Status = hashesMatch && isLiveSnapshot ? UpdateStatus.AlreadyUpToDate : UpdateStatus.UpdateAvailable,
-                Message = snapshot.OriginKind == GridOriginKind.Cached
-                    ? $"Using cached grid from {snapshot.CapturedAt.LocalDateTime:g}. Live providers were unavailable during the most recent refresh."
-                    : hashesMatch
-                        ? "Your installed MetaGrid hash already matches the latest available live grid."
-                        : $"Live grid preview ready from {snapshot.SourceName}. Install Grid will use this exact validated snapshot without refreshing providers again.",
-                GridHash = snapshot.Hash,
-                ChangedHeroCount = changedHeroCount,
-                ProviderStatus = snapshot.ProviderStatus,
-                OriginKind = snapshot.OriginKind,
-                SourceName = snapshot.SourceName,
-                SourceStrategy = snapshot.SourceStrategy,
-                RetrievedAt = snapshot.CapturedAt,
-                ProviderMessage = snapshot.SourceDetails,
-                InstalledHash = currentHash,
-                AvailableHash = snapshot.Hash,
-                TargetPath = selectedAccount.HeroGridConfigPath,
-                ConfirmedInstallSnapshot = installSnapshot,
-                Trigger = UpdateTriggerKind.ManualCheck
-            };
+            return CreateCheckResult(
+                composition,
+                currentHash,
+                selectedAccount.HeroGridConfigPath,
+                changedHeroCount,
+                hashesMatch,
+                isLiveSnapshot,
+                installSnapshot,
+                UpdateTriggerKind.ManualCheck);
         }
         finally
         {
@@ -171,50 +146,13 @@ public sealed class UpdateService(
                 return NoSelectedAccountResult(UpdateTriggerKind.Automatic);
             }
 
-            HeroGridSnapshot snapshot;
-            try
+            var fetch = await TryFetchBaseSnapshotAsync(settings, forceRefresh: false, UpdateTriggerKind.Automatic, cancellationToken);
+            if (!fetch.Succeeded || fetch.BaseSnapshot is null)
             {
-                snapshot = await provider.FetchAsync(settings.PreferredPreset, cancellationToken);
+                return fetch.FailureResult!;
             }
-            catch (HeroGridProviderParseException ex)
-            {
-                await loggingService.LogAsync(LogLevelKind.Warning, "Automatic update cycle parsing failed.", new { ex.Message }, cancellationToken);
-                return new UpdateRunResult
-                {
-                    Status = UpdateStatus.ParsingFailed,
-                    Message = "MetaGrid reached Dota2ProTracker, but the downloaded hero-grid payload could not be parsed.",
-                    GridHash = settings.LastInstalledHash ?? string.Empty,
-                    ProviderStatus = ProviderStatus.ParsingFailed,
-                    ProviderMessage = ex.Message,
-                    Trigger = UpdateTriggerKind.Automatic
-                };
-            }
-            catch (HeroGridProviderUnavailableException ex)
-            {
-                await loggingService.LogAsync(LogLevelKind.Warning, "Automatic update cycle source unavailable.", new { ex.Message, ex.Status }, cancellationToken);
-                return new UpdateRunResult
-                {
-                    Status = UpdateStatus.SourceUnavailable,
-                    Message = "MetaGrid could not retrieve the official Dota2ProTracker High Winrate grid during the automatic update cycle.",
-                    GridHash = settings.LastInstalledHash ?? string.Empty,
-                    ProviderStatus = ex.Status,
-                    ProviderMessage = ex.Message,
-                    Trigger = UpdateTriggerKind.Automatic
-                };
-            }
-            catch (Exception ex)
-            {
-                await loggingService.LogAsync(LogLevelKind.Error, "Automatic update cycle failed with an unexpected provider error.", new { ex.Message }, cancellationToken);
-                return new UpdateRunResult
-                {
-                    Status = UpdateStatus.UnexpectedResponse,
-                    Message = "MetaGrid received an unexpected response while running the automatic D2PT update cycle.",
-                    GridHash = settings.LastInstalledHash ?? string.Empty,
-                    ProviderStatus = ProviderStatus.UnexpectedResponse,
-                    ProviderMessage = ex.Message,
-                    Trigger = UpdateTriggerKind.Automatic
-                };
-            }
+
+            var snapshot = fetch.BaseSnapshot;
 
             await loggingService.LogAsync(LogLevelKind.Information, "Automatic update provider snapshot received.", new
             {
@@ -247,16 +185,17 @@ public sealed class UpdateService(
                     trigger: UpdateTriggerKind.Automatic);
             }
 
-            var changedHeroCount = CountChangedHeroes(snapshot);
+            var composition = await ComposeEffectiveSnapshotAsync(snapshot, settings, selectedAccount, forceRefresh: false, cancellationToken);
+            var changedHeroCount = CountChangedHeroes(composition.EffectiveSnapshot);
             var currentHash = await dotaGridService.ReadInstalledMetaGridHashAsync(selectedAccount.HeroGridConfigPath, cancellationToken);
-            var installSnapshot = CreateInstallSnapshot(selectedAccount, snapshot);
-            var hashesMatch = string.Equals(currentHash, snapshot.Hash, StringComparison.OrdinalIgnoreCase);
+            var installSnapshot = CreateInstallSnapshot(selectedAccount, composition);
+            var hashesMatch = string.Equals(currentHash, composition.EffectiveGridHash, StringComparison.OrdinalIgnoreCase);
 
             if (snapshot.OriginKind == GridOriginKind.Cached)
             {
                 await loggingService.LogAsync(LogLevelKind.Warning, "Automatic update cycle skipped installation because only cached data was available.", new
                 {
-                    snapshot.Hash,
+                    composition.EffectiveGridHash,
                     currentHash,
                     snapshot.CapturedAt
                 }, cancellationToken);
@@ -267,16 +206,24 @@ public sealed class UpdateService(
                     Message = hashesMatch
                         ? "Live D2PT retrieval failed, but the installed grid already matches the last valid cached snapshot. No automatic write was performed."
                         : "Live D2PT retrieval failed. MetaGrid preserved the last installed grid and did not automatically install cached-only data.",
-                    GridHash = snapshot.Hash,
+                    GridHash = composition.EffectiveGridHash,
                     ChangedHeroCount = changedHeroCount,
                     ProviderStatus = snapshot.ProviderStatus,
                     OriginKind = snapshot.OriginKind,
                     SourceName = snapshot.SourceName,
                     SourceStrategy = snapshot.SourceStrategy,
                     RetrievedAt = snapshot.CapturedAt,
-                    ProviderMessage = snapshot.SourceDetails,
+                    ProviderMessage = BuildProviderMessage(snapshot.SourceDetails, composition.Personalization),
                     InstalledHash = currentHash,
-                    AvailableHash = snapshot.Hash,
+                    AvailableHash = composition.EffectiveGridHash,
+                    BaseSourceHash = composition.BaseSourceHash,
+                    EffectiveGridHash = composition.EffectiveGridHash,
+                    PersonalizationStatus = composition.Personalization.Status.ToString(),
+                    PersonalizationMessage = composition.Personalization.Message,
+                    PersonalizationAccountId = composition.Personalization.AccountId,
+                    PersonalizationAccountDisplayName = composition.Personalization.DisplayName,
+                    PersonalizationUsedCache = composition.Personalization.UsedCache,
+                    PersonalHeroCount = composition.Personalization.Selection?.SelectedHeroes.Count ?? 0,
                     TargetPath = selectedAccount.HeroGridConfigPath,
                     ConfirmedInstallSnapshot = hashesMatch ? installSnapshot : null,
                     Trigger = UpdateTriggerKind.Automatic
@@ -296,16 +243,24 @@ public sealed class UpdateService(
                 {
                     Status = UpdateStatus.AlreadyUpToDate,
                     Message = "No semantic grid change was detected. The installed MetaGrid-managed hero grid is already current.",
-                    GridHash = snapshot.Hash,
+                    GridHash = composition.EffectiveGridHash,
                     ChangedHeroCount = changedHeroCount,
                     ProviderStatus = snapshot.ProviderStatus,
                     OriginKind = snapshot.OriginKind,
                     SourceName = snapshot.SourceName,
                     SourceStrategy = snapshot.SourceStrategy,
                     RetrievedAt = snapshot.CapturedAt,
-                    ProviderMessage = snapshot.SourceDetails,
+                    ProviderMessage = BuildProviderMessage(snapshot.SourceDetails, composition.Personalization),
                     InstalledHash = currentHash,
-                    AvailableHash = snapshot.Hash,
+                    AvailableHash = composition.EffectiveGridHash,
+                    BaseSourceHash = composition.BaseSourceHash,
+                    EffectiveGridHash = composition.EffectiveGridHash,
+                    PersonalizationStatus = composition.Personalization.Status.ToString(),
+                    PersonalizationMessage = composition.Personalization.Message,
+                    PersonalizationAccountId = composition.Personalization.AccountId,
+                    PersonalizationAccountDisplayName = composition.Personalization.DisplayName,
+                    PersonalizationUsedCache = composition.Personalization.UsedCache,
+                    PersonalHeroCount = composition.Personalization.Selection?.SelectedHeroes.Count ?? 0,
                     TargetPath = selectedAccount.HeroGridConfigPath,
                     ConfirmedInstallSnapshot = installSnapshot,
                     Trigger = UpdateTriggerKind.Automatic
@@ -316,10 +271,12 @@ public sealed class UpdateService(
             {
                 selectedAccount.AccountId,
                 PreviousHash = currentHash,
-                NewHash = snapshot.Hash
+                NewHash = composition.EffectiveGridHash,
+                composition.BaseSourceHash,
+                PersonalizationStatus = composition.Personalization.Status.ToString()
             }, cancellationToken);
 
-            return await InstallSnapshotAsync(selectedAccount, snapshot, installSnapshot, settings, UpdateTriggerKind.Automatic, cancellationToken);
+            return await InstallSnapshotAsync(selectedAccount, composition.EffectiveSnapshot, installSnapshot, settings, UpdateTriggerKind.Automatic, cancellationToken);
         }
         finally
         {
@@ -406,13 +363,77 @@ public sealed class UpdateService(
         }
     }
 
+    public async Task<UpdateRunResult> ForceInstallLatestAsync(
+        IReadOnlyList<SteamAccount> accounts,
+        AppSettings settings,
+        CancellationToken cancellationToken)
+    {
+        await _updateGate.WaitAsync(cancellationToken);
+        try
+        {
+            var selectedAccount = ResolveSelectedAccount(accounts);
+            if (selectedAccount is null)
+            {
+                return NoSelectedAccountResult(UpdateTriggerKind.ManualInstall);
+            }
+
+            var fetch = await TryFetchBaseSnapshotAsync(settings, forceRefresh: true, UpdateTriggerKind.ManualInstall, cancellationToken);
+            if (!fetch.Succeeded || fetch.BaseSnapshot is null)
+            {
+                return fetch.FailureResult!;
+            }
+
+            var snapshot = fetch.BaseSnapshot;
+            var snapshotValidation = await ValidateSnapshotAsync(snapshot, cancellationToken);
+            if (!snapshotValidation.IsValid)
+            {
+                return FailureResult(
+                    "The provider snapshot failed canonical validation and cannot be used for installation.",
+                    snapshot,
+                    await dotaGridService.ReadInstalledMetaGridHashAsync(selectedAccount.HeroGridConfigPath, cancellationToken),
+                    CountChangedHeroes(snapshot),
+                    selectedAccount.HeroGridConfigPath,
+                    snapshotValidation.Error,
+                    trigger: UpdateTriggerKind.ManualInstall);
+            }
+
+            if (snapshot.OriginKind == GridOriginKind.Cached)
+            {
+                return new UpdateRunResult
+                {
+                    Status = UpdateStatus.SourceUnavailable,
+                    Message = "MetaGrid requires a validated live snapshot before force-installing the latest grid.",
+                    GridHash = snapshot.Hash,
+                    ChangedHeroCount = CountChangedHeroes(snapshot),
+                    ProviderStatus = snapshot.ProviderStatus,
+                    OriginKind = snapshot.OriginKind,
+                    SourceName = snapshot.SourceName,
+                    SourceStrategy = snapshot.SourceStrategy,
+                    RetrievedAt = snapshot.CapturedAt,
+                    ProviderMessage = snapshot.SourceDetails,
+                    TargetPath = selectedAccount.HeroGridConfigPath,
+                    Trigger = UpdateTriggerKind.ManualInstall
+                };
+            }
+
+            var composition = await ComposeEffectiveSnapshotAsync(snapshot, settings, selectedAccount, forceRefresh: true, cancellationToken);
+            var installSnapshot = CreateInstallSnapshot(selectedAccount, composition);
+            return await InstallSnapshotAsync(selectedAccount, composition.EffectiveSnapshot, installSnapshot, settings, UpdateTriggerKind.ManualInstall, cancellationToken, forceReinstall: true);
+        }
+        finally
+        {
+            _updateGate.Release();
+        }
+    }
+
     private async Task<UpdateRunResult> InstallSnapshotAsync(
         SteamAccount account,
         HeroGridSnapshot snapshot,
         InstallGridSnapshot installSnapshot,
         AppSettings settings,
         UpdateTriggerKind trigger,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool forceReinstall = false)
     {
         var changedHeroCount = CountChangedHeroes(snapshot);
         var expectedCanonical = dotaGridService.CanonicalizeSnapshot(snapshot);
@@ -431,7 +452,7 @@ public sealed class UpdateService(
                 installSnapshot);
         }
 
-        if (string.Equals(currentHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+        if (!forceReinstall && string.Equals(currentHash, expectedHash, StringComparison.OrdinalIgnoreCase))
         {
             return new UpdateRunResult
             {
@@ -447,6 +468,12 @@ public sealed class UpdateService(
                 ProviderMessage = snapshot.SourceDetails,
                 InstalledHash = currentHash,
                 AvailableHash = snapshot.Hash,
+                BaseSourceHash = installSnapshot.BaseSourceHash,
+                EffectiveGridHash = installSnapshot.EffectiveGridHash ?? snapshot.Hash,
+                PersonalizationStatus = installSnapshot.PersonalizationStatus,
+                PersonalizationMessage = installSnapshot.PersonalizationMessage,
+                PersonalizationAccountId = installSnapshot.PersonalizationAccountId,
+                PersonalizationUsedCache = installSnapshot.PersonalizationUsedCache,
                 TargetPath = account.HeroGridConfigPath,
                 ConfirmedInstallSnapshot = installSnapshot
                 ,
@@ -575,6 +602,12 @@ public sealed class UpdateService(
                 NewHash = snapshot.Hash,
                 AvailableHash = snapshot.Hash,
                 InstalledHash = snapshot.Hash,
+                BaseSourceHash = installSnapshot.BaseSourceHash,
+                EffectiveGridHash = installSnapshot.EffectiveGridHash ?? snapshot.Hash,
+                PersonalizationStatus = installSnapshot.PersonalizationStatus,
+                PersonalizationMessage = installSnapshot.PersonalizationMessage,
+                PersonalizationAccountId = installSnapshot.PersonalizationAccountId,
+                PersonalizationUsedCache = installSnapshot.PersonalizationUsedCache,
                 BackupFilePath = backupEntry?.FilePath,
                 BackupOperationId = backupEntry?.OperationId,
                 BackupHash = backupEntry?.BackupHash,
@@ -604,6 +637,16 @@ public sealed class UpdateService(
                 ProviderMessage = snapshot.SourceDetails,
                 InstalledHash = snapshot.Hash,
                 AvailableHash = snapshot.Hash,
+                BaseSourceHash = installSnapshot.BaseSourceHash,
+                EffectiveGridHash = installSnapshot.EffectiveGridHash ?? snapshot.Hash,
+                PersonalizationStatus = installSnapshot.PersonalizationStatus,
+                PersonalizationMessage = installSnapshot.PersonalizationMessage,
+                PersonalizationAccountId = installSnapshot.PersonalizationAccountId,
+                PersonalizationUsedCache = installSnapshot.PersonalizationUsedCache,
+                PersonalHeroCount = installSnapshot.Snapshot.Layouts
+                    .FirstOrDefault(layout => layout.Name.Contains("All Roles", StringComparison.OrdinalIgnoreCase))?
+                    .Categories.FirstOrDefault(category => string.Equals(category.Name, "MY BEST HEROES", StringComparison.OrdinalIgnoreCase))?
+                    .HeroIds.Count ?? 0,
                 BackupEntry = backupEntry,
                 OperationId = operationId,
                 TargetPath = targetPath,
@@ -660,6 +703,12 @@ public sealed class UpdateService(
                 NewHash = liveFileTouched && rollback.Succeeded ? originalHash : null,
                 AvailableHash = snapshot.Hash,
                 InstalledHash = liveFileTouched && rollback.Succeeded ? originalHash : null,
+                BaseSourceHash = installSnapshot.BaseSourceHash,
+                EffectiveGridHash = installSnapshot.EffectiveGridHash ?? snapshot.Hash,
+                PersonalizationStatus = installSnapshot.PersonalizationStatus,
+                PersonalizationMessage = installSnapshot.PersonalizationMessage,
+                PersonalizationAccountId = installSnapshot.PersonalizationAccountId,
+                PersonalizationUsedCache = installSnapshot.PersonalizationUsedCache,
                 BackupFilePath = backupEntry?.FilePath,
                 BackupOperationId = backupEntry?.OperationId ?? operationId,
                 BackupHash = backupEntry?.BackupHash,
@@ -683,6 +732,12 @@ public sealed class UpdateService(
                 ProviderMessage = ex.Message,
                 InstalledHash = liveFileTouched && rollback.Succeeded ? originalHash : null,
                 AvailableHash = snapshot.Hash,
+                BaseSourceHash = installSnapshot.BaseSourceHash,
+                EffectiveGridHash = installSnapshot.EffectiveGridHash ?? snapshot.Hash,
+                PersonalizationStatus = installSnapshot.PersonalizationStatus,
+                PersonalizationMessage = installSnapshot.PersonalizationMessage,
+                PersonalizationAccountId = installSnapshot.PersonalizationAccountId,
+                PersonalizationUsedCache = installSnapshot.PersonalizationUsedCache,
                 BackupEntry = backupEntry,
                 OperationId = operationId,
                 TargetPath = targetPath,
@@ -692,18 +747,181 @@ public sealed class UpdateService(
         }
     }
 
-    private InstallGridSnapshot CreateInstallSnapshot(SteamAccount account, HeroGridSnapshot snapshot)
+    private InstallGridSnapshot CreateInstallSnapshot(SteamAccount account, EffectiveGridCompositionResult composition)
         => new()
         {
-            Snapshot = snapshot,
+            Snapshot = composition.EffectiveSnapshot,
             AccountId = account.AccountId,
             AccountDisplayName = account.DisplayName,
             TargetPath = account.HeroGridConfigPath,
             PreparedAt = DateTimeOffset.UtcNow,
-            HeroCount = CountChangedHeroes(snapshot),
-            GroupCount = snapshot.Layouts.SelectMany(layout => layout.Categories).Select(category => category.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            BaseSourceHash = composition.BaseSourceHash,
+            EffectiveGridHash = composition.EffectiveGridHash,
+            PersonalizationStatus = composition.Personalization.Status.ToString(),
+            PersonalizationMessage = composition.Personalization.Message,
+            PersonalizationAccountId = composition.Personalization.AccountId,
+            PersonalizationUsedCache = composition.Personalization.UsedCache,
+            HeroCount = CountChangedHeroes(composition.EffectiveSnapshot),
+            GroupCount = composition.EffectiveSnapshot.Layouts.SelectMany(layout => layout.Categories).Select(category => category.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
             HasExistingGridFile = File.Exists(account.HeroGridConfigPath)
         };
+
+    private async Task<(bool Succeeded, HeroGridSnapshot? BaseSnapshot, UpdateRunResult? FailureResult)> TryFetchBaseSnapshotAsync(
+        AppSettings settings,
+        bool forceRefresh,
+        UpdateTriggerKind trigger,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var snapshot = await provider.FetchAsync(settings.PreferredPreset, cancellationToken);
+            return (true, snapshot, null);
+        }
+        catch (HeroGridProviderParseException ex)
+        {
+            await loggingService.LogAsync(LogLevelKind.Warning, "Hero grid parsing failed", new { ex.Message, forceRefresh, trigger }, cancellationToken);
+            return (false, null, new UpdateRunResult
+            {
+                Status = UpdateStatus.ParsingFailed,
+                Message = trigger == UpdateTriggerKind.Automatic
+                    ? "MetaGrid reached Dota2ProTracker, but the downloaded hero-grid payload could not be parsed."
+                    : "MetaGrid reached the active data source, but the returned hero-grid data could not be parsed.",
+                GridHash = settings.LastInstalledHash ?? string.Empty,
+                ProviderStatus = ProviderStatus.ParsingFailed,
+                ProviderMessage = ex.Message,
+                Trigger = trigger
+            });
+        }
+        catch (HeroGridProviderUnavailableException ex)
+        {
+            await loggingService.LogAsync(LogLevelKind.Warning, "Hero grid unavailable", new { ex.Message, ex.Status, forceRefresh, trigger }, cancellationToken);
+            return (false, null, new UpdateRunResult
+            {
+                Status = UpdateStatus.SourceUnavailable,
+                Message = trigger == UpdateTriggerKind.Automatic
+                    ? "MetaGrid could not retrieve the official Dota2ProTracker High Winrate grid during the automatic update cycle."
+                    : "The active hero-grid data source is currently unavailable.",
+                GridHash = settings.LastInstalledHash ?? string.Empty,
+                ProviderStatus = ex.Status,
+                ProviderMessage = ex.Message,
+                Trigger = trigger
+            });
+        }
+        catch (Exception ex)
+        {
+            await loggingService.LogAsync(LogLevelKind.Error, "Hero grid source unavailable", new { ex.Message, forceRefresh, trigger }, cancellationToken);
+            return (false, null, new UpdateRunResult
+            {
+                Status = UpdateStatus.UnexpectedResponse,
+                Message = trigger == UpdateTriggerKind.Automatic
+                    ? "MetaGrid received an unexpected response while running the automatic D2PT update cycle."
+                    : "MetaGrid received an unexpected response while checking the active hero-grid data source.",
+                GridHash = settings.LastInstalledHash ?? string.Empty,
+                ProviderStatus = ProviderStatus.UnexpectedResponse,
+                ProviderMessage = ex.Message,
+                Trigger = trigger
+            });
+        }
+    }
+
+    private async Task<EffectiveGridCompositionResult> ComposeEffectiveSnapshotAsync(
+        HeroGridSnapshot baseSnapshot,
+        AppSettings settings,
+        SteamAccount? selectedAccount,
+        bool forceRefresh,
+        CancellationToken cancellationToken)
+    {
+        var personalization = await personalizationService.ResolveAsync(
+            settings,
+            BuildPersonalizationAccountContext(settings, selectedAccount),
+            forceRefresh,
+            cancellationToken);
+        var effectiveSnapshot = personalizedGridComposer.Compose(baseSnapshot, personalization);
+        return new EffectiveGridCompositionResult
+        {
+            BaseSnapshot = baseSnapshot,
+            EffectiveSnapshot = effectiveSnapshot,
+            BaseSourceHash = baseSnapshot.Hash,
+            EffectiveGridHash = effectiveSnapshot.Hash,
+            Personalization = personalization
+        };
+    }
+
+    private static PersonalizationAccountContext BuildPersonalizationAccountContext(AppSettings settings, SteamAccount? selectedAccount)
+        => settings.PersonalizationAccountSourceMode == PersonalizationAccountSourceMode.ManualAccount
+            ? new PersonalizationAccountContext
+            {
+                SourceMode = PersonalizationAccountSourceMode.ManualAccount,
+                AccountId = settings.PersonalizationManualAccountId ?? settings.PersonalizationAccountId
+            }
+            : new PersonalizationAccountContext
+            {
+                SourceMode = PersonalizationAccountSourceMode.SelectedSteamAccount,
+                AccountId = selectedAccount?.AccountId,
+                DisplayName = selectedAccount?.DisplayName
+            };
+
+    private UpdateRunResult CreateCheckResult(
+        EffectiveGridCompositionResult composition,
+        string? currentHash,
+        string targetPath,
+        int changedHeroCount,
+        bool hashesMatch,
+        bool isLiveSnapshot,
+        InstallGridSnapshot installSnapshot,
+        UpdateTriggerKind trigger)
+    {
+        var snapshot = composition.EffectiveSnapshot;
+        return new UpdateRunResult
+        {
+            Status = hashesMatch && isLiveSnapshot ? UpdateStatus.AlreadyUpToDate : UpdateStatus.UpdateAvailable,
+            Message = snapshot.OriginKind == GridOriginKind.Cached
+                ? $"Using cached grid from {snapshot.CapturedAt.LocalDateTime:g}. Live providers were unavailable during the most recent refresh."
+                : hashesMatch
+                    ? "Your installed MetaGrid hash already matches the latest available live grid."
+                    : $"Live grid preview ready from {snapshot.SourceName}. Install Grid will use this exact validated snapshot without refreshing providers again.",
+            GridHash = composition.EffectiveGridHash,
+            ChangedHeroCount = changedHeroCount,
+            ProviderStatus = snapshot.ProviderStatus,
+            OriginKind = snapshot.OriginKind,
+            SourceName = snapshot.SourceName,
+            SourceStrategy = snapshot.SourceStrategy,
+            RetrievedAt = snapshot.CapturedAt,
+            ProviderMessage = BuildProviderMessage(snapshot.SourceDetails, composition.Personalization),
+            InstalledHash = currentHash,
+            AvailableHash = composition.EffectiveGridHash,
+            BaseSourceHash = composition.BaseSourceHash,
+            EffectiveGridHash = composition.EffectiveGridHash,
+            PersonalizationStatus = composition.Personalization.Status.ToString(),
+            PersonalizationMessage = composition.Personalization.Message,
+            PersonalizationAccountId = composition.Personalization.AccountId,
+            PersonalizationAccountDisplayName = composition.Personalization.DisplayName,
+            PersonalizationUsedCache = composition.Personalization.UsedCache,
+            PersonalHeroCount = composition.Personalization.Selection?.SelectedHeroes.Count ?? 0,
+            TargetPath = targetPath,
+            ConfirmedInstallSnapshot = installSnapshot,
+            Trigger = trigger
+        };
+    }
+
+    private static string BuildProviderMessage(string? sourceDetails, PersonalizationResolution personalization)
+    {
+        var personalMessage = personalization.Status switch
+        {
+            PersonalizationStatus.Disabled => "Personal heroes off.",
+            PersonalizationStatus.Ready => "Personal heroes ready.",
+            PersonalizationStatus.NoQualifyingHeroes => "No qualifying heroes in last 90 days.",
+            PersonalizationStatus.ProfileUnavailable => "Profile private or match data unavailable.",
+            PersonalizationStatus.Cached => "Using cached personal heroes.",
+            PersonalizationStatus.OpenDotaUnavailable => "OpenDota unavailable.",
+            PersonalizationStatus.InvalidInput => "Personal profile input invalid.",
+            _ => string.Empty
+        };
+
+        return string.IsNullOrWhiteSpace(sourceDetails)
+            ? personalMessage
+            : $"{sourceDetails} {personalMessage}".Trim();
+    }
 
     private async Task<(bool IsValid, string? Error)> ValidateSnapshotAsync(HeroGridSnapshot snapshot, CancellationToken cancellationToken)
     {
@@ -774,6 +992,12 @@ public sealed class UpdateService(
         CanonicalHeroGridSnapshot expectedCanonical,
         string expectedHash)
     {
+        var nativeStructure = dotaGridService.ValidateNativeStructure(file);
+        if (!nativeStructure.IsValid)
+        {
+            return (false, $"The generated Dota hero-grid file does not match required native structure: {nativeStructure.Error}", null, null);
+        }
+
         if (file.Version < 3)
         {
             return (false, "The generated Dota hero-grid file uses an invalid version.", null, null);
@@ -998,6 +1222,12 @@ public sealed class UpdateService(
             ProviderMessage = providerMessage,
             InstalledHash = currentHash,
             AvailableHash = snapshot.Hash,
+            BaseSourceHash = installSnapshot?.BaseSourceHash,
+            EffectiveGridHash = installSnapshot?.EffectiveGridHash ?? snapshot.Hash,
+            PersonalizationStatus = installSnapshot?.PersonalizationStatus,
+            PersonalizationMessage = installSnapshot?.PersonalizationMessage,
+            PersonalizationAccountId = installSnapshot?.PersonalizationAccountId,
+            PersonalizationUsedCache = installSnapshot?.PersonalizationUsedCache ?? false,
             TargetPath = targetPath,
             ConfirmedInstallSnapshot = installSnapshot
             ,
@@ -1031,5 +1261,41 @@ public sealed class UpdateService(
         public string? FinalFileRereadHash { get; set; }
         public string? ValidationStage { get; set; }
         public string? SemanticDiffSummary { get; set; }
+    }
+
+    private sealed class NullPersonalizationService : IPersonalizationService
+    {
+        public Task<PersonalizationResolution> ConnectAsync(string profileInput, CancellationToken cancellationToken)
+            => Task.FromResult(new PersonalizationResolution
+            {
+                Status = PersonalizationStatus.Disabled,
+                SourceMode = PersonalizationAccountSourceMode.ManualAccount,
+                Message = "Personal heroes are disabled."
+            });
+
+        public Task DisconnectAsync(AppSettings settings, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public ProfileInputParseResult ParseProfileInput(string? input) => ProfileInputParseResult.Failure("Personalization disabled.");
+
+        public Task<PersonalizationResolution> RefreshAsync(AppSettings settings, PersonalizationAccountContext accountContext, CancellationToken cancellationToken)
+            => Task.FromResult(new PersonalizationResolution
+            {
+                Status = PersonalizationStatus.Disabled,
+                SourceMode = accountContext.SourceMode,
+                Message = "Personal heroes are disabled."
+            });
+
+        public Task<PersonalizationResolution> ResolveAsync(AppSettings settings, PersonalizationAccountContext accountContext, bool forceRefresh, CancellationToken cancellationToken)
+            => Task.FromResult(new PersonalizationResolution
+            {
+                Status = PersonalizationStatus.Disabled,
+                SourceMode = accountContext.SourceMode,
+                Message = "Personal heroes are disabled."
+            });
+    }
+
+    private sealed class PassThroughPersonalizedGridComposer : IPersonalizedGridComposer
+    {
+        public HeroGridSnapshot Compose(HeroGridSnapshot baseSnapshot, PersonalizationResolution personalization) => baseSnapshot;
     }
 }

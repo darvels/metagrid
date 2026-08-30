@@ -1,7 +1,10 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
+using System.Windows.Media;
+using MediaBrush = System.Windows.Media.Brush;
 using MetaGrid.Core.Abstractions;
 using MetaGrid.Core.Models;
 using MetaGrid.Infrastructure.Services;
@@ -42,9 +45,15 @@ public sealed class MainViewModel : ObservableObject
     private readonly INotificationService _notificationService;
     private readonly IStartupService _startupService;
     private readonly IAppPaths _appPaths;
+    private readonly IAppUpdateService _appUpdateService;
+    private readonly IAppRuntimeInfo _appRuntimeInfo;
     private readonly IAppClock _appClock;
     private readonly IUiDispatcher _uiDispatcher;
     private readonly GridSnapshotCacheService _gridSnapshotCacheService;
+    private readonly IPersonalizationService _personalizationService;
+    private readonly IPersonalHeroCacheService _personalHeroCacheService;
+    private readonly IPersonalizedGridComposer _personalizedGridComposer;
+    private readonly UiTextService _text;
     private readonly CancellationTokenSource _lifetimeCts = new();
     private HeroGridSnapshot? _availableInstallSnapshot;
     private AppSettings _settings = new();
@@ -73,18 +82,41 @@ public sealed class MainViewModel : ObservableObject
     private string _initializationWarning = string.Empty;
     private string _currentSourceText = "Dota2ProTracker not checked yet";
     private string _heroCountText = "Unknown";
+    private string _baseGridHashText = "Unknown";
     private string _roleSummaryText = string.Join(", ", KnownRoles);
     private string _gridCriteriaText = "Official Dota2ProTracker High Winrate grid";
     private string _topFivePreviewText = "Run Check for Updates to load the latest official Dota2ProTracker High Winrate layouts.";
     private string _statusChipText = "Not checked";
     private string _autoUpdateChipText = "Auto Update On";
     private string _providerStatusChipText = "Source not checked";
+    private string _personalizationInput = string.Empty;
+    private string _personalizationSourceText = "Selected Steam account";
+    private string _personalizationStatusText = "Personal heroes off";
+    private string _personalizationDetailsText = "OpenDota automatically uses your selected Steam account to add MY BEST HEROES to the All Roles layout.";
+    private string _personalizationConnectedAccountText = "No OpenDota account resolved yet";
+    private string _personalizationLastRefreshText = "Never";
     private HeroGridLayoutPreview? _selectedGridPreviewLayout;
     private IReadOnlyDictionary<int, string>? _heroNamesById;
     private bool _steamAutoDetectionStarted;
     private CancellationTokenSource? _scheduleCts;
     private Task? _schedulerTask;
     private Task? _startupAutomaticUpdateTask;
+    private CancellationTokenSource? _appUpdateScheduleCts;
+    private Task? _appUpdateSchedulerTask;
+    private AppUpdateInfo? _latestAppUpdateInfo;
+    private HeroGridOverviewState _overviewState = HeroGridOverviewState.NotChecked;
+    private string _appUpdateStatusTitle = "App updates not checked yet";
+    private string _appUpdateStatusText = "MetaGrid can check GitHub Releases for newer application builds separately from Dota hero-grid updates.";
+    private string _appUpdateChipText = "Not checked";
+    private string _appUpdateLastCheckedText = "Never";
+    private string _appUpdateAvailableVersionText = "Unknown";
+    private readonly string _currentAppVersionText;
+    private MediaBrush _statusChipBackgroundBrush = CreateBrush("#262626");
+    private MediaBrush _statusChipBorderBrush = CreateBrush("#343434");
+    private MediaBrush _providerChipBackgroundBrush = CreateBrush("#262626");
+    private MediaBrush _providerChipBorderBrush = CreateBrush("#343434");
+    private MediaBrush _providerIndicatorBrush = CreateBrush("#858585");
+    private LanguageOption? _selectedLanguageOption;
 
     public MainViewModel(
         ISettingsService settingsService,
@@ -98,9 +130,15 @@ public sealed class MainViewModel : ObservableObject
         INotificationService notificationService,
         IStartupService startupService,
         IAppPaths appPaths,
+        IAppUpdateService appUpdateService,
+        IAppRuntimeInfo appRuntimeInfo,
         IAppClock appClock,
         IUiDispatcher uiDispatcher,
-        GridSnapshotCacheService gridSnapshotCacheService)
+        GridSnapshotCacheService gridSnapshotCacheService,
+        IPersonalizationService personalizationService,
+        IPersonalHeroCacheService personalHeroCacheService,
+        IPersonalizedGridComposer personalizedGridComposer,
+        UiTextService text)
     {
         _settingsService = settingsService;
         _steamAccountService = steamAccountService;
@@ -113,14 +151,28 @@ public sealed class MainViewModel : ObservableObject
         _notificationService = notificationService;
         _startupService = startupService;
         _appPaths = appPaths;
+        _appUpdateService = appUpdateService;
+        _appRuntimeInfo = appRuntimeInfo;
         _appClock = appClock;
         _uiDispatcher = uiDispatcher;
         _gridSnapshotCacheService = gridSnapshotCacheService;
+        _personalizationService = personalizationService;
+        _personalHeroCacheService = personalHeroCacheService;
+        _personalizedGridComposer = personalizedGridComposer;
+        _text = text;
+        _currentAppVersionText = appRuntimeInfo.GetCurrentVersion();
 
         Accounts = [];
         History = [];
         GridPreviewLayouts = [];
+        PersonalHeroPreviewItems = [];
+        Text = text;
         Presets = Enum.GetValues<HeroGridPreset>();
+        LanguageOptions =
+        [
+            new LanguageOption(AppLanguage.English, "EN"),
+            new LanguageOption(AppLanguage.Russian, "RU")
+        ];
         UpdateIntervalOptions =
         [
             new UpdateIntervalOption(UpdateInterval.FifteenMinutes, "15 minutes"),
@@ -131,10 +183,18 @@ public sealed class MainViewModel : ObservableObject
             new UpdateIntervalOption(UpdateInterval.TwelveHours, "12 hours"),
             new UpdateIntervalOption(UpdateInterval.TwentyFourHours, "24 hours")
         ];
+        PersonalizationSourceOptions =
+        [
+            new PersonalizationSourceModeOption(PersonalizationAccountSourceMode.SelectedSteamAccount, "Selected Steam account"),
+            new PersonalizationSourceModeOption(PersonalizationAccountSourceMode.ManualAccount, "Manual OpenDota account")
+        ];
 
         CheckNowCommand = new AsyncRelayCommand(() => CheckForUpdatesAsync(forceWrite: false), CanRunInteractiveCommand);
-        ForceRefreshCommand = new AsyncRelayCommand(() => CheckForUpdatesAsync(forceWrite: true), CanRunInteractiveCommand);
+        ForceRefreshCommand = new AsyncRelayCommand(ForceUpdateAsync, CanRunInteractiveCommand);
         InstallGridCommand = new AsyncRelayCommand(InstallGridAsync, CanRunInstallCommand);
+        CheckAppUpdatesCommand = new AsyncRelayCommand(CheckAppUpdatesAsync, CanRunInteractiveCommand);
+        InstallAppUpdateCommand = new AsyncRelayCommand(InstallAppUpdateAsync, CanInstallAppUpdate);
+        LaterAppUpdateCommand = new AsyncRelayCommand(DeferAppUpdateAsync, CanDeferAppUpdate);
         DetectSteamCommand = new AsyncRelayCommand(RefreshAccountsAsync, CanRunInteractiveCommand);
         SaveSettingsCommand = new AsyncRelayCommand(SaveEditableSettingsAsync, CanSaveSettings);
         ClearHistoryCommand = new AsyncRelayCommand(ClearHistoryAsync, CanRunInteractiveCommand);
@@ -144,17 +204,27 @@ public sealed class MainViewModel : ObservableObject
         OpenConfigCommand = new RelayCommand(() => OpenFolder(_appPaths.RootDirectory));
         NextOnboardingCommand = new RelayCommand(AdvanceOnboarding);
         FinishOnboardingCommand = new AsyncRelayCommand(FinishOnboardingAsync);
+        ConnectPersonalizationCommand = new AsyncRelayCommand(ConnectPersonalizationAsync, CanRunInteractiveCommand);
+        DisconnectPersonalizationCommand = new AsyncRelayCommand(DisconnectPersonalizationAsync, CanRunInteractiveCommand);
+        RefreshPersonalHeroesCommand = new AsyncRelayCommand(RefreshPersonalHeroesAsync, CanRunInteractiveCommand);
     }
 
     public ObservableCollection<AccountViewModel> Accounts { get; }
     public ObservableCollection<UpdateHistoryEntry> History { get; }
     public ObservableCollection<HeroGridLayoutPreview> GridPreviewLayouts { get; }
+    public ObservableCollection<PersonalHeroPreviewItem> PersonalHeroPreviewItems { get; }
     public Array Presets { get; }
-    public IReadOnlyList<UpdateIntervalOption> UpdateIntervalOptions { get; }
+    public UiTextService Text { get; }
+    public IReadOnlyList<LanguageOption> LanguageOptions { get; }
+    public IReadOnlyList<UpdateIntervalOption> UpdateIntervalOptions { get; private set; }
+    public IReadOnlyList<PersonalizationSourceModeOption> PersonalizationSourceOptions { get; }
 
     public AsyncRelayCommand CheckNowCommand { get; }
     public AsyncRelayCommand ForceRefreshCommand { get; }
     public AsyncRelayCommand InstallGridCommand { get; }
+    public AsyncRelayCommand CheckAppUpdatesCommand { get; }
+    public AsyncRelayCommand InstallAppUpdateCommand { get; }
+    public AsyncRelayCommand LaterAppUpdateCommand { get; }
     public AsyncRelayCommand DetectSteamCommand { get; }
     public AsyncRelayCommand SaveSettingsCommand { get; }
     public AsyncRelayCommand ClearHistoryCommand { get; }
@@ -164,6 +234,9 @@ public sealed class MainViewModel : ObservableObject
     public RelayCommand OpenConfigCommand { get; }
     public RelayCommand NextOnboardingCommand { get; }
     public AsyncRelayCommand FinishOnboardingCommand { get; }
+    public AsyncRelayCommand ConnectPersonalizationCommand { get; }
+    public AsyncRelayCommand DisconnectPersonalizationCommand { get; }
+    public AsyncRelayCommand RefreshPersonalHeroesCommand { get; }
 
     public AppPage SelectedPage
     {
@@ -201,13 +274,13 @@ public sealed class MainViewModel : ObservableObject
 
     public string StatusTitle
     {
-        get => _statusTitle;
+        get => _text.Translate(_statusTitle);
         set => SetProperty(ref _statusTitle, value);
     }
 
     public string StatusText
     {
-        get => _statusText;
+        get => _text.Translate(_statusText);
         set => SetProperty(ref _statusText, value);
     }
 
@@ -225,7 +298,7 @@ public sealed class MainViewModel : ObservableObject
 
     public string SelectedAccountText
     {
-        get => _selectedAccountText;
+        get => _text.Translate(_selectedAccountText);
         set => SetProperty(ref _selectedAccountText, value);
     }
 
@@ -259,6 +332,38 @@ public sealed class MainViewModel : ObservableObject
         set => SetProperty(ref _nextCheckText, value);
     }
 
+    public string AppUpdateStatusTitle
+    {
+        get => _text.Translate(_appUpdateStatusTitle);
+        private set => SetProperty(ref _appUpdateStatusTitle, value);
+    }
+
+    public string AppUpdateStatusText
+    {
+        get => _text.Translate(_appUpdateStatusText);
+        private set => SetProperty(ref _appUpdateStatusText, value);
+    }
+
+    public string AppUpdateChipText
+    {
+        get => _text.Translate(_appUpdateChipText);
+        private set => SetProperty(ref _appUpdateChipText, value);
+    }
+
+    public string AppUpdateLastCheckedText
+    {
+        get => _appUpdateLastCheckedText;
+        private set => SetProperty(ref _appUpdateLastCheckedText, value);
+    }
+
+    public string AppUpdateAvailableVersionText
+    {
+        get => _appUpdateAvailableVersionText;
+        private set => SetProperty(ref _appUpdateAvailableVersionText, value);
+    }
+
+    public string CurrentAppVersionText => _currentAppVersionText;
+
     public bool OnboardingVisible
     {
         get => _onboardingVisible;
@@ -275,6 +380,10 @@ public sealed class MainViewModel : ObservableObject
                 RaisePropertyChanged(nameof(OnboardingTitle));
                 RaisePropertyChanged(nameof(OnboardingDescription));
                 RaisePropertyChanged(nameof(OnboardingPrimaryLabel));
+                RaisePropertyChanged(nameof(OnboardingStepLabel));
+                RaisePropertyChanged(nameof(OnboardingSelectedAccountLabel));
+                RaisePropertyChanged(nameof(OnboardingAccountsHintText));
+                RaisePropertyChanged(nameof(OnboardingAutoUpdateHelpText));
                 RaisePropertyChanged(nameof(IsOnboardingWelcomeStep));
                 RaisePropertyChanged(nameof(IsOnboardingSteamStep));
                 RaisePropertyChanged(nameof(IsOnboardingAccountsStep));
@@ -288,25 +397,25 @@ public sealed class MainViewModel : ObservableObject
 
     public string ProviderStatusText
     {
-        get => _providerStatusText;
+        get => _text.Translate(_providerStatusText);
         set => SetProperty(ref _providerStatusText, value);
     }
 
     public string ProviderCardTitle
     {
-        get => _providerCardTitle;
+        get => _text.Translate(_providerCardTitle);
         set => SetProperty(ref _providerCardTitle, value);
     }
 
     public string SteamDetectionStatusText
     {
-        get => _steamDetectionStatusText;
+        get => _text.Translate(_steamDetectionStatusText);
         set => SetProperty(ref _steamDetectionStatusText, value);
     }
 
     public string SteamDetectionPathText
     {
-        get => _steamDetectionPathText;
+        get => _text.Translate(_steamDetectionPathText);
         set => SetProperty(ref _steamDetectionPathText, value);
     }
 
@@ -324,7 +433,7 @@ public sealed class MainViewModel : ObservableObject
 
     public string CurrentSourceText
     {
-        get => _currentSourceText;
+        get => _text.Translate(_currentSourceText);
         set => SetProperty(ref _currentSourceText, value);
     }
 
@@ -332,6 +441,12 @@ public sealed class MainViewModel : ObservableObject
     {
         get => _heroCountText;
         set => SetProperty(ref _heroCountText, value);
+    }
+
+    public string BaseGridHashText
+    {
+        get => _baseGridHashText;
+        set => SetProperty(ref _baseGridHashText, value);
     }
 
     public string RoleSummaryText
@@ -342,32 +457,114 @@ public sealed class MainViewModel : ObservableObject
 
     public string GridCriteriaText
     {
-        get => _gridCriteriaText;
+        get => _text.Translate(_gridCriteriaText);
         set => SetProperty(ref _gridCriteriaText, value);
     }
 
     public string TopFivePreviewText
     {
-        get => _topFivePreviewText;
+        get => _text.Translate(_topFivePreviewText);
         set => SetProperty(ref _topFivePreviewText, value);
     }
 
     public string StatusChipText
     {
-        get => _statusChipText;
+        get => _text.Translate(_statusChipText);
         set => SetProperty(ref _statusChipText, value);
     }
 
     public string AutoUpdateChipText
     {
-        get => _autoUpdateChipText;
+        get => _text.Translate(_autoUpdateChipText);
         set => SetProperty(ref _autoUpdateChipText, value);
     }
 
     public string ProviderStatusChipText
     {
-        get => _providerStatusChipText;
+        get => _text.Translate(_providerStatusChipText);
         set => SetProperty(ref _providerStatusChipText, value);
+    }
+
+    public string PersonalizationInput
+    {
+        get => _personalizationInput;
+        set => SetProperty(ref _personalizationInput, value);
+    }
+
+    public string PersonalizationStatusText
+    {
+        get => _text.Translate(_personalizationStatusText);
+        set => SetProperty(ref _personalizationStatusText, value);
+    }
+
+    public string PersonalizationSourceText
+    {
+        get => _text.Translate(_personalizationSourceText);
+        set => SetProperty(ref _personalizationSourceText, value);
+    }
+
+    public string PersonalizationDetailsText
+    {
+        get => _text.Translate(_personalizationDetailsText);
+        set => SetProperty(ref _personalizationDetailsText, value);
+    }
+
+    public string PersonalizationConnectedAccountText
+    {
+        get => _text.Translate(_personalizationConnectedAccountText);
+        set => SetProperty(ref _personalizationConnectedAccountText, value);
+    }
+
+    public string PersonalizationLastRefreshText
+    {
+        get => _text.Translate(_personalizationLastRefreshText);
+        set => SetProperty(ref _personalizationLastRefreshText, value);
+    }
+
+    public LanguageOption? SelectedLanguageOption
+    {
+        get => _selectedLanguageOption;
+        set
+        {
+            if (SetProperty(ref _selectedLanguageOption, value) && value is not null)
+            {
+                _text.Language = value.Value;
+                _settings.Language = value.Value;
+                _editableSettings.Language = value.Value;
+                RefreshLocalizedBindings();
+                _ = PersistSettingsAsync(CancellationToken.None);
+            }
+        }
+    }
+
+    public MediaBrush StatusChipBackgroundBrush
+    {
+        get => _statusChipBackgroundBrush;
+        private set => SetProperty(ref _statusChipBackgroundBrush, value);
+    }
+
+    public MediaBrush StatusChipBorderBrush
+    {
+        get => _statusChipBorderBrush;
+        private set => SetProperty(ref _statusChipBorderBrush, value);
+    }
+
+    public MediaBrush ProviderStatusChipBackgroundBrush
+    {
+        get => _providerChipBackgroundBrush;
+        private set => SetProperty(ref _providerChipBackgroundBrush, value);
+    }
+
+    public MediaBrush ProviderStatusChipBorderBrush
+    {
+        get => _providerChipBorderBrush;
+        private set => SetProperty(ref _providerChipBorderBrush, value);
+    }
+
+    public MediaBrush ProviderIndicatorBrush
+    {
+        get => _providerIndicatorBrush;
+        private set => SetProperty(ref _providerIndicatorBrush, value);
     }
 
     public HeroGridLayoutPreview? SelectedGridPreviewLayout
@@ -386,8 +583,11 @@ public sealed class MainViewModel : ObservableObject
 
     public AppSettings Settings => _settings;
     public AppSettings EditableSettings => _editableSettings;
-    public bool HasLiveAvailableGrid => !string.IsNullOrWhiteSpace(_settings.LastRemoteHash) && ParseOrigin(_settings.LastGridOrigin) != GridOriginKind.Cached;
-    public bool HasInstalledGrid => !string.IsNullOrWhiteSpace(_settings.LastInstalledHash);
+    public bool ShowAppUpdateBanner => _latestAppUpdateInfo?.State == AppUpdateCheckState.UpdateAvailable;
+    public bool HasAppUpdateAvailable => _latestAppUpdateInfo?.IsUpdateAvailable == true;
+    public bool HasDeferredAppUpdate => _latestAppUpdateInfo?.State == AppUpdateCheckState.Deferred;
+    public bool HasLiveAvailableGrid => !string.IsNullOrWhiteSpace(_settings.LastEffectiveGridHash ?? _settings.LastRemoteHash) && ParseOrigin(_settings.LastGridOrigin) != GridOriginKind.Cached;
+    public bool HasInstalledGrid => GetSelectedInstalledState() == InstalledMetaGridState.Present && !string.IsNullOrWhiteSpace(GetSelectedInstalledHash());
     public bool CanOfferInstallAction => GetInstallActionState().CanOfferAction;
     public string InstallActionText => GetInstallActionState().ActionLabel;
     public string InstallActionSummary => HasInstalledGrid
@@ -416,23 +616,23 @@ public sealed class MainViewModel : ObservableObject
     }
 
     public string SettingsSaveStateText => IsSettingsDirty
-        ? "Unsaved changes are ready to save."
-        : "All displayed settings are currently saved.";
-    public string HeroCountLabel => "Unique Heroes";
+        ? _text.Translate("Unsaved changes are ready to save.")
+        : _text.Translate("All displayed settings are currently saved.");
+    public string HeroCountLabel => _text.T("Unique Heroes", "Уникальные герои");
     public string CurrentGridPreviewTitle => SelectedGridPreviewLayout is null
-        ? "Current Grid Preview"
+        ? _text.Translate("Current Grid Preview")
         : $"{SelectedGridPreviewLayout.Name} Layout";
     public string CurrentGridPreviewSubtitle => SelectedGridPreviewLayout is null
-        ? "Run Check for Updates to load the latest official Dota2ProTracker High Winrate layouts."
+        ? _text.Translate("Run Check for Updates to load the latest official Dota2ProTracker High Winrate layouts.")
         : $"{SelectedGridPreviewLayout.Categories.Count} category blocks in official order.";
 
     public string OnboardingTitle => OnboardingStep switch
     {
-        1 => "Welcome to MetaGrid",
-        2 => "Steam Detection",
-        3 => "Dota Accounts",
-        4 => "Automatic Updates",
-        _ => "You're ready"
+        1 => _text.Translate("Welcome to MetaGrid"),
+        2 => _text.Translate("Steam Detection"),
+        3 => _text.Translate("Dota Accounts"),
+        4 => _text.Translate("Automatic Updates"),
+        _ => _text.Translate("You're ready")
     };
 
     public string OnboardingDescription => OnboardingStep switch
@@ -440,16 +640,34 @@ public sealed class MainViewModel : ObservableObject
         1 => "Keep a dedicated MetaGrid hero layout current using the official Dota2ProTracker High Winrate grid while preserving your own custom Dota layouts.",
         2 => SteamDetectionStatusText,
         3 => Accounts.Count == 0
-            ? "No Dota accounts are selected yet. MetaGrid stays usable even if Steam or Dota is not detected immediately."
-            : $"Detected {Accounts.Count} Dota-ready account(s). Select the account MetaGrid should update.",
-        4 => $"Automatic updates are {(Settings.AutoUpdateEnabled ? "enabled" : "disabled")} with a {FormatInterval(Settings.UpdateInterval)} interval for checking the official Dota2ProTracker High Winrate grid.",
-        _ => "MetaGrid can now open the main workspace, continue background checks, and keep your Dota 2 hero grid in sync."
+            ? _text.T("No Dota accounts are selected yet. MetaGrid stays usable even if Steam or Dota is not detected immediately.", "Пока не выбран ни один аккаунт Dota. MetaGrid остаётся рабочим, даже если Steam или Dota не были обнаружены сразу.")
+            : _text.T($"Detected {Accounts.Count} Dota-ready account(s). Select the account MetaGrid should update.", $"Найдено Dota-аккаунтов: {Accounts.Count}. Выберите аккаунт, который будет обновлять MetaGrid."),
+        4 => _text.T(
+            $"Automatic updates are {(Settings.AutoUpdateEnabled ? "enabled" : "disabled")} with a {FormatInterval(Settings.UpdateInterval)} interval for checking the official Dota2ProTracker High Winrate grid.",
+            $"Автообновления {(Settings.AutoUpdateEnabled ? "включены" : "выключены")}. Интервал проверки официальной High Winrate сетки Dota2ProTracker: {FormatInterval(Settings.UpdateInterval)}."),
+        _ => _text.T("MetaGrid can now open the main workspace, continue background checks, and keep your Dota 2 hero grid in sync.", "MetaGrid теперь может открыть основное окно, продолжить фоновые проверки и держать вашу сетку героев Dota 2 в актуальном состоянии.")
     };
 
-    public string OnboardingPrimaryLabel => IsOnboardingReadyStep ? "Open MetaGrid" : "Continue";
+    public string OnboardingPrimaryLabel => IsOnboardingReadyStep ? _text.Translate("Open MetaGrid") : _text.Translate("Continue");
+    public string OnboardingStepLabel => _text.FormatStepChip(OnboardingStep);
+    public string OnboardingSelectedAccountLabel => _text.T($"Selected account: {SelectedAccountText}", $"Выбранный аккаунт: {SelectedAccountText}");
+    public string OnboardingAccountsHintText => _text.T("If you have multiple valid Dota accounts, you can fine-tune the selection later on the Accounts page.", "Если у вас несколько корректных аккаунтов Dota, позже можно точно выбрать нужный на странице аккаунтов.");
+    public string OnboardingAutoUpdateHelpText => _text.T("When enabled, MetaGrid checks Dota2ProTracker on schedule and safely installs a new grid automatically only when the validated semantic hash changes.", "Когда функция включена, MetaGrid по расписанию проверяет Dota2ProTracker и автоматически устанавливает новую сетку только при реальном изменении проверенного семантического хэша.");
 
     public string OnboardingSummaryText =>
-        $"Source: {CurrentSourceText}\nSelected account: {SelectedAccountText}\nNext check: {NextCheckText}";
+        _text.Language == AppLanguage.Russian
+            ? $"Источник: {CurrentSourceText}\nВыбранный аккаунт: {SelectedAccountText}\nСледующая проверка: {NextCheckText}"
+            : $"Source: {CurrentSourceText}\nSelected account: {SelectedAccountText}\nNext check: {NextCheckText}";
+
+    public string AppUpdateBannerTitle => HasAppUpdateAvailable ? "MetaGrid update available" : "MetaGrid is current";
+    public string AppUpdateBannerText => HasAppUpdateAvailable
+        ? _text.T($"GitHub Releases has MetaGrid {AppUpdateAvailableVersionText} ready. Your current app version is {CurrentAppVersionText}.", $"GitHub Releases Ð´Ð¾ÑÑ‚ÑƒÐ¿Ð½Ð° Ð²ÐµÑ€ÑÐ¸Ñ MetaGrid {AppUpdateAvailableVersionText}. Ð¡ÐµÐ¹Ñ‡Ð°Ñ ÑƒÑÑ‚Ð°Ð½Ð¾Ð²Ð»ÐµÐ½Ð° Ð²ÐµÑ€ÑÐ¸Ñ {CurrentAppVersionText}.")
+        : _text.T("This MetaGrid build is already current.", "Ð­Ñ‚Ð° ÑÐ±Ð¾Ñ€ÐºÐ° MetaGrid ÑƒÐ¶Ðµ Ð°ÐºÑ‚ÑƒÐ°Ð»ÑŒÐ½Ð°.");
+    public string CheckAppUpdatesLabel => _text.T("Check for App Updates", "ÐŸÑ€Ð¾Ð²ÐµÑ€Ð¸Ñ‚ÑŒ Ð¾Ð±Ð½Ð¾Ð²Ð»ÐµÐ½Ð¸Ñ Ð¿Ñ€Ð¸Ð»Ð¾Ð¶ÐµÐ½Ð¸Ñ");
+    public string UpdateNowLabel => _text.T("Update Now", "ÐžÐ±Ð½Ð¾Ð²Ð¸Ñ‚ÑŒ ÑÐµÐ¹Ñ‡Ð°Ñ");
+    public string LaterLabel => _text.T("Later", "ÐŸÐ¾Ð·Ð¶Ðµ");
+
+    public bool HasPersonalHeroPreview => PersonalHeroPreviewItems.Count > 0;
 
     public async Task InitializeAsync()
     {
@@ -464,6 +682,7 @@ public sealed class MainViewModel : ObservableObject
         await TryLoadHistoryAsync();
         ApplySettingsToUi();
         await TryStartAutomaticUpdatesAsync();
+        await TryStartAppUpdateChecksAsync();
 
         IsInitializing = false;
 
@@ -481,6 +700,7 @@ public sealed class MainViewModel : ObservableObject
     public async Task ShutdownAsync()
     {
         await StopSchedulerAsync();
+        await StopAppUpdateSchedulerAsync();
 
         try
         {
@@ -506,6 +726,8 @@ public sealed class MainViewModel : ObservableObject
     private bool CanRunInteractiveCommand() => !IsInitializing && !IsBusy;
     private bool CanSaveSettings() => CanRunInteractiveCommand() && IsSettingsDirty;
     private bool CanRunInstallCommand() => CanRunInteractiveCommand() && CanOfferInstallAction;
+    private bool CanInstallAppUpdate() => CanRunInteractiveCommand() && HasAppUpdateAvailable;
+    private bool CanDeferAppUpdate() => CanRunInteractiveCommand() && HasAppUpdateAvailable;
 
     private async Task TryLoadSettingsAsync()
     {
@@ -561,18 +783,28 @@ public sealed class MainViewModel : ObservableObject
 
     private void ApplySettingsToUi()
     {
-        LastCheckedText = _settings.LastCheckAt?.ToLocalTime().ToString("g") ?? "Never";
-        LastUpdatedText = _settings.LastSuccessfulUpdateAt?.ToLocalTime().ToString("g") ?? "Never";
-        AvailableGridHashText = ToShortHash(_settings.LastRemoteHash) ?? "Unknown";
-        InstalledGridHashText = ToShortHash(_settings.LastInstalledHash) ?? "Not installed";
+        _text.Language = _settings.Language;
+        SelectedLanguageOption = LanguageOptions.FirstOrDefault(option => option.Value == _settings.Language) ?? LanguageOptions[0];
+        LastCheckedText = FormatDashboardTimestamp(_settings.LastCheckAt);
+        LastUpdatedText = FormatDashboardTimestamp(_settings.LastSuccessfulUpdateAt);
+        AvailableGridHashText = ToShortHash(_settings.LastEffectiveGridHash ?? _settings.LastRemoteHash) ?? "Unknown";
+        InstalledGridHashText = "Not installed";
         CachedGridHashText = ToShortHash(_settings.LastCachedHash) ?? "Not cached";
+        BaseGridHashText = ToShortHash(_settings.LastBaseSourceHash) ?? "Unknown";
         CurrentSourceText = BuildSourceStatusText();
+        ApplyAppUpdateStateFromSettings();
+        ApplyAppUpdateStateFromSettings();
         RoleSummaryText = string.IsNullOrWhiteSpace(_settings.LastRoleSummary) ? string.Join(", ", KnownRoles) : _settings.LastRoleSummary;
-        GridCriteriaText = "Official Dota2ProTracker High Winrate grid";
+        GridCriteriaText = BuildGridCriteriaText();
         AutoUpdateChipText = _settings.AutoUpdateEnabled ? "Auto Update On" : "Auto Update Off";
         ProviderCardTitle = "Data Source";
         ProviderStatusText = ToProviderStatusText(_settings.LastProviderStatus, ParseOrigin(_settings.LastGridOrigin), _settings.LastSourceName);
         ProviderStatusChipText = ToProviderChipText(_settings.LastProviderStatus, ParseOrigin(_settings.LastGridOrigin), _settings.LastSourceName);
+        ApplyAppUpdateStateFromSettings();
+        PersonalizationInput = _settings.PersonalizationAccountSourceMode == PersonalizationAccountSourceMode.ManualAccount
+            ? _settings.PersonalizationManualAccountId ?? string.Empty
+            : string.Empty;
+        ApplyPersonalizationStateFromSettings();
         if (_settings.LastHeroCount is int heroCount && heroCount > 0)
         {
             HeroCountText = heroCount.ToString();
@@ -587,6 +819,7 @@ public sealed class MainViewModel : ObservableObject
         }
 
         _ = TryApplyCachedPreviewAsync();
+        _ = TryLoadPersonalHeroPreviewAsync();
 
         OnboardingVisible = !_settings.OnboardingCompleted;
         UpdateSelectedAccountUi();
@@ -621,6 +854,18 @@ public sealed class MainViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(_settings.LastRemoteHash))
         {
             _settings.LastRemoteHash = cachedSnapshot.Hash;
+            changed = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(_settings.LastBaseSourceHash))
+        {
+            _settings.LastBaseSourceHash = cachedSnapshot.Hash;
+            changed = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(_settings.LastEffectiveGridHash))
+        {
+            _settings.LastEffectiveGridHash = _settings.LastRemoteHash ?? cachedSnapshot.Hash;
             changed = true;
         }
 
@@ -704,8 +949,9 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(_settings.LastRemoteHash)
-            && string.Equals(_settings.LastRemoteHash, cachedSnapshot.Hash, StringComparison.OrdinalIgnoreCase))
+        var effectiveHash = _settings.LastEffectiveGridHash ?? _settings.LastRemoteHash;
+        if (!string.IsNullOrWhiteSpace(effectiveHash)
+            && string.Equals(effectiveHash, cachedSnapshot.Hash, StringComparison.OrdinalIgnoreCase))
         {
             _availableInstallSnapshot = cachedSnapshot;
         }
@@ -713,9 +959,10 @@ public sealed class MainViewModel : ObservableObject
 
     private async Task EnsureAvailableInstallSnapshotAsync()
     {
+        var effectiveHash = _settings.LastEffectiveGridHash ?? _settings.LastRemoteHash;
         if (_availableInstallSnapshot is not null
-            && !string.IsNullOrWhiteSpace(_settings.LastRemoteHash)
-            && string.Equals(_availableInstallSnapshot.Hash, _settings.LastRemoteHash, StringComparison.OrdinalIgnoreCase))
+            && !string.IsNullOrWhiteSpace(effectiveHash)
+            && string.Equals(_availableInstallSnapshot.Hash, effectiveHash, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
@@ -751,6 +998,252 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private async Task TryStartAppUpdateChecksAsync()
+    {
+        try
+        {
+            await StartAppUpdateChecksAsync();
+        }
+        catch (Exception ex)
+        {
+            await _loggingService.LogAsync(LogLevelKind.Warning, "App update startup orchestration failed during startup.", new { ex.Message }, _lifetimeCts.Token);
+            AppUpdateStatusTitle = "App update checks unavailable";
+            AppUpdateStatusText = "MetaGrid could not start the GitHub Releases update check loop.";
+            AppUpdateChipText = "Failed";
+        }
+    }
+
+    private Task StartAppUpdateChecksAsync()
+    {
+        if (!_settings.AutomaticallyCheckAppUpdates)
+        {
+            AppUpdateStatusTitle = "Automatic app updates disabled";
+            AppUpdateStatusText = "MetaGrid will not check GitHub Releases automatically until you enable app update checks again.";
+            AppUpdateChipText = "Disabled";
+            return StopAppUpdateSchedulerAsync();
+        }
+
+        var nextAt = _settings.LastAppUpdateCheckAt?.AddHours(12);
+        var initialDelay = nextAt is null || nextAt <= _appClock.Now
+            ? TimeSpan.FromSeconds(45)
+            : nextAt.Value - _appClock.Now;
+
+        return ScheduleAppUpdateChecksAsync(initialDelay);
+    }
+
+    private Task ScheduleAppUpdateChecksAsync(TimeSpan initialDelay)
+    {
+        _appUpdateScheduleCts?.Cancel();
+        _appUpdateScheduleCts?.Dispose();
+        _appUpdateScheduleCts = null;
+        _appUpdateSchedulerTask = null;
+
+        if (!_settings.AutomaticallyCheckAppUpdates)
+        {
+            return Task.CompletedTask;
+        }
+
+        _appUpdateScheduleCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts.Token);
+        var token = _appUpdateScheduleCts.Token;
+        _appUpdateSchedulerTask = Task.Run(() => RunAppUpdateSchedulerLoopAsync(initialDelay, token), CancellationToken.None);
+        return Task.CompletedTask;
+    }
+
+    private async Task RunAppUpdateSchedulerLoopAsync(TimeSpan initialDelay, CancellationToken token)
+    {
+        try
+        {
+            if (initialDelay > TimeSpan.Zero)
+            {
+                await _appClock.DelayAsync(initialDelay, token);
+            }
+
+            while (!token.IsCancellationRequested)
+            {
+                if (!IsBusy)
+                {
+                    await RunAppUpdateCheckAsync(manual: false);
+                }
+
+                await _appClock.DelayAsync(TimeSpan.FromHours(12), token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown or scheduler reconfiguration.
+        }
+    }
+
+    private async Task StopAppUpdateSchedulerAsync()
+    {
+        if (_appUpdateScheduleCts is null)
+        {
+            return;
+        }
+
+        _appUpdateScheduleCts.Cancel();
+        var schedulerTask = _appUpdateSchedulerTask;
+        _appUpdateScheduleCts.Dispose();
+        _appUpdateScheduleCts = null;
+        _appUpdateSchedulerTask = null;
+
+        if (schedulerTask is not null)
+        {
+            try
+            {
+                await schedulerTask;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected during shutdown.
+            }
+        }
+    }
+
+    private Task CheckAppUpdatesAsync() => RunAppUpdateCheckAsync(manual: true);
+
+    private async Task RunAppUpdateCheckAsync(bool manual)
+    {
+        if (manual && IsBusy)
+        {
+            return;
+        }
+
+        var shouldManageBusy = manual;
+        try
+        {
+            if (shouldManageBusy)
+            {
+                IsBusy = true;
+            }
+
+            var progress = new Progress<AppUpdateProgress>(update =>
+            {
+                AppUpdateStatusTitle = update.Phase switch
+                {
+                    AppUpdateProgressPhase.Checking => "Checking app updates",
+                    AppUpdateProgressPhase.Downloading => "Downloading update",
+                    AppUpdateProgressPhase.Verifying => "Verifying update",
+                    AppUpdateProgressPhase.Extracting => "Preparing update",
+                    AppUpdateProgressPhase.LaunchingUpdater => "Launching updater",
+                    AppUpdateProgressPhase.Completed => "Update complete",
+                    _ => "App update failed"
+                };
+                AppUpdateStatusText = update.Message;
+                AppUpdateChipText = update.Phase == AppUpdateProgressPhase.Failed ? "Failed" : "Checking";
+            });
+
+            var updateInfo = await _appUpdateService.CheckForUpdatesAsync(_settings, manual, progress, _lifetimeCts.Token);
+            ApplyAppUpdateInfo(updateInfo);
+            await PersistSettingsAsync(_lifetimeCts.Token);
+
+            if (manual)
+            {
+                if (updateInfo.State == AppUpdateCheckState.UpdateAvailable)
+                {
+                    _notificationService.ShowInfo("MetaGrid update available", $"MetaGrid {updateInfo.AvailableVersion} is ready to install.");
+                }
+                else if (updateInfo.State == AppUpdateCheckState.LatestInstalled)
+                {
+                    _notificationService.ShowSuccess("MetaGrid is up to date", $"You are already on MetaGrid {CurrentAppVersionText}.");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            await _loggingService.LogAsync(LogLevelKind.Error, "MetaGrid app update check crashed unexpectedly.", new { ex.Message }, CancellationToken.None);
+            AppUpdateStatusTitle = "App update check failed";
+            AppUpdateStatusText = ex.Message;
+            AppUpdateChipText = "Failed";
+        }
+        finally
+        {
+            if (shouldManageBusy)
+            {
+                IsBusy = false;
+            }
+        }
+    }
+
+    private async Task InstallAppUpdateAsync()
+    {
+        if (_latestAppUpdateInfo is null || !_latestAppUpdateInfo.IsUpdateAvailable)
+        {
+            await RunAppUpdateCheckAsync(manual: true);
+            if (_latestAppUpdateInfo is null || !_latestAppUpdateInfo.IsUpdateAvailable)
+            {
+                return;
+            }
+        }
+
+        try
+        {
+            IsBusy = true;
+            var progress = new Progress<AppUpdateProgress>(update =>
+            {
+                AppUpdateStatusTitle = update.Phase switch
+                {
+                    AppUpdateProgressPhase.Downloading => "Downloading MetaGrid update",
+                    AppUpdateProgressPhase.Verifying => "Verifying MetaGrid update",
+                    AppUpdateProgressPhase.Extracting => "Preparing MetaGrid update",
+                    AppUpdateProgressPhase.LaunchingUpdater => "Starting MetaGrid updater",
+                    _ => "Preparing MetaGrid update"
+                };
+                AppUpdateStatusText = update.Message;
+                AppUpdateChipText = "Checking";
+            });
+
+            var launchResult = await _appUpdateService.PrepareAndLaunchUpdateAsync(_settings, _latestAppUpdateInfo, progress, _lifetimeCts.Token);
+            AppUpdateStatusTitle = launchResult.State == AppUpdateInstallState.Started ? "MetaGrid updater started" : "MetaGrid update failed";
+            AppUpdateStatusText = launchResult.Message;
+            AppUpdateChipText = launchResult.State == AppUpdateInstallState.Started ? "Updating" : "Failed";
+
+            if (launchResult.ShouldExitApplication)
+            {
+                await PersistSettingsAsync(_lifetimeCts.Token);
+                System.Windows.Application.Current?.Shutdown();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            await _loggingService.LogAsync(LogLevelKind.Error, "MetaGrid app update launch failed unexpectedly.", new { ex.Message }, CancellationToken.None);
+            AppUpdateStatusTitle = "MetaGrid update failed";
+            AppUpdateStatusText = ex.Message;
+            AppUpdateChipText = "Failed";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task DeferAppUpdateAsync()
+    {
+        if (_latestAppUpdateInfo?.AvailableVersion is null)
+        {
+            return;
+        }
+
+        _settings.DeferredAppUpdateVersion = _latestAppUpdateInfo.AvailableVersion;
+        _settings.DeferredAppUpdateUntil = _appClock.Now.AddHours(12);
+        ApplyAppUpdateInfo(_latestAppUpdateInfo with
+        {
+            State = AppUpdateCheckState.Deferred,
+            Message = $"MetaGrid {_latestAppUpdateInfo.AvailableVersion} will be shown again later.",
+            IsUpdateAvailable = false,
+            IsDeferred = true
+        });
+        await PersistSettingsAsync(_lifetimeCts.Token);
+    }
+
     private async Task StartAutomaticUpdatesAsync()
     {
         var startupDecision = AutomaticUpdateStartupPolicy.CreateDecision(_settings, _appClock.Now);
@@ -768,7 +1261,7 @@ public sealed class MainViewModel : ObservableObject
             return;
         }
 
-        NextCheckText = "Startup check pending";
+        NextCheckText = _text.T("Startup check pending", "Проверка при запуске ожидается");
         AutoUpdateChipText = "Auto Update On";
         RaisePropertyChanged(nameof(OnboardingSummaryText));
 
@@ -784,7 +1277,7 @@ public sealed class MainViewModel : ObservableObject
 
         if (!_settings.AutoUpdateEnabled)
         {
-            NextCheckText = "Automatic updates disabled";
+            NextCheckText = _text.T("Automatic updates disabled", "Автообновления отключены");
             AutoUpdateChipText = "Auto Update Off";
             RaisePropertyChanged(nameof(OnboardingSummaryText));
             return Task.CompletedTask;
@@ -792,7 +1285,7 @@ public sealed class MainViewModel : ObservableObject
 
         var interval = TimeSpan.FromMinutes((int)_settings.UpdateInterval);
         var nextRun = nextCheckAtOverride ?? AutomaticUpdateStartupPolicy.ComputeNextScheduledCheckAt(_appClock.Now, _settings.UpdateInterval);
-        NextCheckText = nextRun.LocalDateTime.ToString("g");
+        NextCheckText = FormatSchedulerTimestamp(nextRun);
         AutoUpdateChipText = "Auto Update On";
         RaisePropertyChanged(nameof(OnboardingSummaryText));
 
@@ -810,7 +1303,7 @@ public sealed class MainViewModel : ObservableObject
             {
                 await _uiDispatcher.InvokeAsync(() =>
                 {
-                    NextCheckText = nextCheckAt.LocalDateTime.ToString("g");
+                    NextCheckText = FormatSchedulerTimestamp(nextCheckAt);
                     RaisePropertyChanged(nameof(OnboardingSummaryText));
                 }, schedulerToken);
 
@@ -849,7 +1342,7 @@ public sealed class MainViewModel : ObservableObject
                         StatusTitle = "Automatic update failed";
                         StatusText = "MetaGrid hit a recoverable automatic-update error. The installed Dota grid was left unchanged and the next check is still scheduled.";
                         StatusChipText = "Auto update failed";
-                        LastCheckedText = _appClock.Now.LocalDateTime.ToString("g");
+                        LastCheckedText = FormatDashboardTimestamp(_appClock.Now);
                         RaisePropertyChanged(nameof(OnboardingSummaryText));
                     }, CancellationToken.None);
 
@@ -967,7 +1460,7 @@ public sealed class MainViewModel : ObservableObject
         Accounts.Clear();
         foreach (var account in accounts)
         {
-            Accounts.Add(new AccountViewModel(account, HandleAccountSelected));
+            Accounts.Add(new AccountViewModel(account, _text, HandleAccountSelected));
         }
 
         if (Accounts.Count > 0 && Accounts.All(x => !x.IsSelected))
@@ -986,6 +1479,11 @@ public sealed class MainViewModel : ObservableObject
         UpdateSelectedAccountUi();
         RaisePropertyChanged(nameof(OnboardingDescription));
         RaisePropertyChanged(nameof(OnboardingSummaryText));
+
+        if (_settings.PersonalizationEnabled && _settings.PersonalizationAccountSourceMode == PersonalizationAccountSourceMode.SelectedSteamAccount)
+        {
+            await RefreshPersonalizationFromCurrentSelectionAsync(forceRefresh: false, notify: false);
+        }
     }
 
     private async Task LoadHistoryAsync()
@@ -1039,6 +1537,46 @@ public sealed class MainViewModel : ObservableObject
                 ? "A manual or automatic update check failed."
                 : InitializationWarning;
             await _loggingService.LogAsync(LogLevelKind.Error, "Update check failed unexpectedly.", new { ex.Message }, CancellationToken.None);
+            _notificationService.ShowError("MetaGrid update failed", ex.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task ForceUpdateAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        try
+        {
+            IsBusy = true;
+            StatusTitle = "Checking for Updates";
+            StatusText = "Checking Dota2ProTracker for the latest High Winrate grid.";
+            StatusChipText = "Checking";
+            ProviderStatusText = "Checking Dota2ProTracker";
+
+            var result = await _updateService.ForceInstallLatestAsync(
+                Accounts.Select(x => x.Model).ToList(),
+                _settings,
+                _lifetimeCts.Token);
+            await ApplyUpdateResultAsync(result, rescheduleAfterUpdate: true);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            StatusTitle = "Update Check Failed";
+            StatusText = "MetaGrid could not check Dota2ProTracker right now. Your installed grid was left unchanged.";
+            ProviderStatusText = "Update check failed";
+            ProviderStatusChipText = "Source error";
+            StatusChipText = "Failed";
+            await _loggingService.LogAsync(LogLevelKind.Error, "Force update failed unexpectedly.", new { ex.Message }, CancellationToken.None);
             _notificationService.ShowError("MetaGrid update failed", ex.Message);
         }
         finally
@@ -1101,7 +1639,7 @@ public sealed class MainViewModel : ObservableObject
                     StatusTitle = "Automatic Update Failed";
                     StatusText = "MetaGrid could not complete this update attempt. Your installed grid was left unchanged, and automatic updates will try again later.";
                     StatusChipText = "Auto update failed";
-                    LastCheckedText = _appClock.Now.LocalDateTime.ToString("g");
+                    LastCheckedText = FormatDashboardTimestamp(_appClock.Now);
                     RaisePropertyChanged(nameof(OnboardingSummaryText));
                 }, CancellationToken.None);
             }
@@ -1123,6 +1661,12 @@ public sealed class MainViewModel : ObservableObject
         var candidateSettings = _settings.CreateCopy();
         candidateSettings.CopyFrom(_editableSettings);
         candidateSettings.BackupRetentionCount = Math.Clamp(candidateSettings.BackupRetentionCount, 1, 50);
+        candidateSettings.PersonalizationManualAccountId = candidateSettings.PersonalizationAccountSourceMode == PersonalizationAccountSourceMode.ManualAccount
+            ? string.IsNullOrWhiteSpace(PersonalizationInput) ? null : PersonalizationInput.Trim()
+            : null;
+        candidateSettings.PersonalizationAccountId = candidateSettings.PersonalizationAccountSourceMode == PersonalizationAccountSourceMode.SelectedSteamAccount
+            ? SelectedAccount?.AccountId
+            : candidateSettings.PersonalizationManualAccountId;
         candidateSettings.SelectedAccountIds = Accounts.Where(x => x.IsSelected).Select(x => x.AccountId).ToList();
         candidateSettings.PreferredAccountId = candidateSettings.SelectedAccountIds.FirstOrDefault();
         candidateSettings.LastRoleSummary = RoleSummaryText;
@@ -1130,6 +1674,13 @@ public sealed class MainViewModel : ObservableObject
         var steamSettingsChanged =
             _settings.AutomaticallyDetectSteam != candidateSettings.AutomaticallyDetectSteam ||
             !string.Equals(_settings.SteamDirectoryOverride, candidateSettings.SteamDirectoryOverride, StringComparison.Ordinal);
+        var personalizationSettingsChanged =
+            _settings.PersonalizationEnabled != candidateSettings.PersonalizationEnabled ||
+            _settings.PersonalizationAccountSourceMode != candidateSettings.PersonalizationAccountSourceMode ||
+            !string.Equals(_settings.PersonalizationManualAccountId, candidateSettings.PersonalizationManualAccountId, StringComparison.Ordinal) ||
+            !string.Equals(_settings.PersonalizationAccountId, candidateSettings.PersonalizationAccountId, StringComparison.Ordinal);
+        var appUpdateSettingsChanged =
+            _settings.AutomaticallyCheckAppUpdates != candidateSettings.AutomaticallyCheckAppUpdates;
 
         try
         {
@@ -1140,6 +1691,12 @@ public sealed class MainViewModel : ObservableObject
             ResetEditableSettingsBaseline();
             AutoUpdateChipText = _settings.AutoUpdateEnabled ? "Auto Update On" : "Auto Update Off";
             await ScheduleAsync();
+            if (appUpdateSettingsChanged)
+            {
+                await StartAppUpdateChecksAsync();
+                ApplyAppUpdateStateFromSettings();
+            }
+
             if (steamSettingsChanged)
             {
                 try
@@ -1150,6 +1707,12 @@ public sealed class MainViewModel : ObservableObject
                 {
                     await _loggingService.LogAsync(LogLevelKind.Warning, "Steam refresh failed after settings save.", new { ex.Message }, CancellationToken.None);
                 }
+            }
+
+            if (personalizationSettingsChanged)
+            {
+                await RefreshPersonalizationFromCurrentSelectionAsync(forceRefresh: false, notify: false);
+                ResetEditableSettingsBaseline();
             }
 
             RaiseInstallActionState();
@@ -1255,9 +1818,8 @@ public sealed class MainViewModel : ObservableObject
             }
 
             await EnsureAvailableInstallSnapshotAsync();
-            var restoredHash = await _dotaGridService.ReadInstalledMetaGridHashAsync(targetPath, _lifetimeCts.Token);
-            selected.Model.CurrentMetaGridHash = restoredHash;
-            _settings.LastInstalledHash = restoredHash;
+            await RefreshSelectedInstalledStateAsync(selected.Model, targetPath);
+            var restoredHash = selected.Model.CurrentMetaGridHash;
             InstalledGridHashText = ToShortHash(restoredHash) ?? "Not installed";
             await _historyService.AppendAsync(
             [
@@ -1341,10 +1903,16 @@ public sealed class MainViewModel : ObservableObject
         CheckNowCommand.NotifyCanExecuteChanged();
         ForceRefreshCommand.NotifyCanExecuteChanged();
         InstallGridCommand.NotifyCanExecuteChanged();
+        CheckAppUpdatesCommand.NotifyCanExecuteChanged();
+        InstallAppUpdateCommand.NotifyCanExecuteChanged();
+        LaterAppUpdateCommand.NotifyCanExecuteChanged();
         DetectSteamCommand.NotifyCanExecuteChanged();
         SaveSettingsCommand.NotifyCanExecuteChanged();
         ClearHistoryCommand.NotifyCanExecuteChanged();
         RestoreBackupCommand.NotifyCanExecuteChanged();
+        ConnectPersonalizationCommand.NotifyCanExecuteChanged();
+        DisconnectPersonalizationCommand.NotifyCanExecuteChanged();
+        RefreshPersonalHeroesCommand.NotifyCanExecuteChanged();
     }
 
     private void HandleAccountSelected(AccountViewModel selectedAccount)
@@ -1360,6 +1928,10 @@ public sealed class MainViewModel : ObservableObject
         UpdateSelectedAccountUi();
         RaisePropertyChanged(nameof(OnboardingDescription));
         RaisePropertyChanged(nameof(OnboardingSummaryText));
+        if (_settings.PersonalizationEnabled && _settings.PersonalizationAccountSourceMode == PersonalizationAccountSourceMode.SelectedSteamAccount)
+        {
+            _ = RefreshPersonalizationFromCurrentSelectionAsync(forceRefresh: false, notify: false);
+        }
     }
 
     private void UpdateSelectedAccountUi()
@@ -1367,9 +1939,11 @@ public sealed class MainViewModel : ObservableObject
         var selected = Accounts.FirstOrDefault(x => x.IsSelected);
         SelectedAccountText = selected?.DisplayName ?? "No account selected";
         SelectedAccountPathText = selected?.ConfigPath ?? "Choose a Dota 2 account to see its configuration path.";
+        SyncSelectedInstalledStateToSettings();
         InstalledGridHashText = selected is null
             ? "Not installed"
             : ToShortHash(selected.Model.CurrentMetaGridHash) ?? "Not installed";
+        RaisePropertyChanged(nameof(OnboardingSelectedAccountLabel));
         RaiseInstallActionState();
     }
 
@@ -1434,7 +2008,9 @@ public sealed class MainViewModel : ObservableObject
 
         if (_settings.LastGridCapturedAt is { } capturedAt)
         {
-            parts.Add($"Last updated {capturedAt.LocalDateTime:g}");
+            parts.Add(_text.T(
+                $"Last updated {FormatInlineTimestamp(capturedAt)}",
+                $"Обновлено {FormatInlineTimestamp(capturedAt)}"));
         }
 
         return string.Join(" - ", parts);
@@ -1449,21 +2025,531 @@ public sealed class MainViewModel : ObservableObject
             _ => sourceStrategy
         };
 
-    private static string FormatInterval(UpdateInterval interval)
+    private void ApplyAppUpdateStateFromSettings()
+    {
+        var state = ParseAppUpdateState(_settings.LastAppUpdateState);
+        var availableVersion = string.IsNullOrWhiteSpace(_settings.LastAvailableAppVersion)
+            ? "Unknown"
+            : _settings.LastAvailableAppVersion;
+
+        AppUpdateAvailableVersionText = availableVersion;
+        AppUpdateLastCheckedText = FormatDashboardTimestamp(_settings.LastAppUpdateCheckAt);
+
+        _latestAppUpdateInfo = state is AppUpdateCheckState.UpdateAvailable or AppUpdateCheckState.Deferred
+            ? new AppUpdateInfo(
+                CurrentAppVersionText,
+                _settings.LastAvailableAppVersion,
+                state,
+                _settings.LastAppUpdateMessage ?? string.Empty,
+                _settings.LastAppUpdateCheckAt ?? _appClock.Now,
+                state == AppUpdateCheckState.UpdateAvailable,
+                state == AppUpdateCheckState.Deferred)
+            : null;
+
+        if (!_settings.AutomaticallyCheckAppUpdates && state is not AppUpdateCheckState.UpdateAvailable and not AppUpdateCheckState.Deferred)
+        {
+            AppUpdateStatusTitle = "Automatic app updates disabled";
+            AppUpdateStatusText = "MetaGrid will not check GitHub Releases automatically until you enable app update checks again.";
+            AppUpdateChipText = "Disabled";
+            RaisePropertyChanged(nameof(ShowAppUpdateBanner));
+            RaisePropertyChanged(nameof(HasAppUpdateAvailable));
+            RaisePropertyChanged(nameof(HasDeferredAppUpdate));
+            RaisePropertyChanged(nameof(AppUpdateBannerTitle));
+            RaisePropertyChanged(nameof(AppUpdateBannerText));
+            NotifyCommandStates();
+            return;
+        }
+
+        var (title, message, chip) = BuildAppUpdatePresentation(
+            state,
+            CurrentAppVersionText,
+            _settings.LastAvailableAppVersion,
+            _settings.LastAppUpdateMessage,
+            _settings.DeferredAppUpdateUntil);
+
+        AppUpdateStatusTitle = title;
+        AppUpdateStatusText = message;
+        AppUpdateChipText = chip;
+        RaisePropertyChanged(nameof(ShowAppUpdateBanner));
+        RaisePropertyChanged(nameof(HasAppUpdateAvailable));
+        RaisePropertyChanged(nameof(HasDeferredAppUpdate));
+        RaisePropertyChanged(nameof(AppUpdateBannerTitle));
+        RaisePropertyChanged(nameof(AppUpdateBannerText));
+        NotifyCommandStates();
+    }
+
+    private void ApplyAppUpdateInfo(AppUpdateInfo updateInfo)
+    {
+        _latestAppUpdateInfo = updateInfo;
+        _settings.LastAppUpdateCheckAt = updateInfo.CheckedAt;
+        _settings.LastAvailableAppVersion = updateInfo.AvailableVersion;
+        _settings.LastAppUpdateState = updateInfo.State.ToString();
+        _settings.LastAppUpdateMessage = updateInfo.Message;
+
+        if (updateInfo.State == AppUpdateCheckState.LatestInstalled)
+        {
+            _settings.DeferredAppUpdateVersion = null;
+            _settings.DeferredAppUpdateUntil = null;
+        }
+        else if (updateInfo.State == AppUpdateCheckState.UpdateAvailable)
+        {
+            if (!string.Equals(_settings.DeferredAppUpdateVersion, updateInfo.AvailableVersion, StringComparison.OrdinalIgnoreCase))
+            {
+                _settings.DeferredAppUpdateVersion = null;
+                _settings.DeferredAppUpdateUntil = null;
+            }
+        }
+
+        AppUpdateAvailableVersionText = updateInfo.AvailableVersion ?? "Unknown";
+        AppUpdateLastCheckedText = FormatDashboardTimestamp(updateInfo.CheckedAt);
+
+        var (title, message, chip) = BuildAppUpdatePresentation(
+            updateInfo.State,
+            updateInfo.CurrentVersion,
+            updateInfo.AvailableVersion,
+            updateInfo.Message,
+            _settings.DeferredAppUpdateUntil);
+
+        AppUpdateStatusTitle = title;
+        AppUpdateStatusText = message;
+        AppUpdateChipText = chip;
+        RaisePropertyChanged(nameof(ShowAppUpdateBanner));
+        RaisePropertyChanged(nameof(HasAppUpdateAvailable));
+        RaisePropertyChanged(nameof(HasDeferredAppUpdate));
+        RaisePropertyChanged(nameof(AppUpdateBannerTitle));
+        RaisePropertyChanged(nameof(AppUpdateBannerText));
+        NotifyCommandStates();
+    }
+
+    private static AppUpdateCheckState ParseAppUpdateState(string? value)
+        => Enum.TryParse<AppUpdateCheckState>(value, ignoreCase: true, out var parsed)
+            ? parsed
+            : AppUpdateCheckState.Unknown;
+
+    private (string Title, string Message, string Chip) BuildAppUpdatePresentation(
+        AppUpdateCheckState state,
+        string currentVersion,
+        string? availableVersion,
+        string? message,
+        DateTimeOffset? deferredUntil)
+        => state switch
+        {
+            AppUpdateCheckState.UpdateAvailable => (
+                "MetaGrid update available",
+                string.IsNullOrWhiteSpace(message) ? $"MetaGrid {availableVersion} is available. You are currently on {currentVersion}." : message,
+                "Update available"),
+            AppUpdateCheckState.LatestInstalled => (
+                "MetaGrid is up to date",
+                string.IsNullOrWhiteSpace(message) ? $"MetaGrid {currentVersion} matches the latest GitHub Release." : message,
+                "Up to date"),
+            AppUpdateCheckState.Deferred => (
+                "MetaGrid update deferred",
+                deferredUntil is null
+                    ? (string.IsNullOrWhiteSpace(message) ? $"MetaGrid {availableVersion} is available and will be shown again later." : message)
+                    : (string.IsNullOrWhiteSpace(message) ? $"MetaGrid {availableVersion} was deferred until {FormatInlineTimestamp(deferredUntil.Value)}." : message),
+                "Deferred"),
+            AppUpdateCheckState.Checking => (
+                "Checking app updates",
+                "MetaGrid is checking GitHub Releases for a newer application build.",
+                "Checking"),
+            AppUpdateCheckState.RateLimited => (
+                "GitHub rate limit reached",
+                string.IsNullOrWhiteSpace(message) ? "GitHub temporarily rate-limited MetaGrid update checks. Try again later." : message,
+                "Rate limited"),
+            AppUpdateCheckState.Unavailable => (
+                "App update source unavailable",
+                string.IsNullOrWhiteSpace(message) ? "MetaGrid could not reach GitHub Releases right now." : message,
+                "Unavailable"),
+            AppUpdateCheckState.InvalidRelease => (
+                "Release package unavailable",
+                string.IsNullOrWhiteSpace(message) ? "No valid stable MetaGrid release package was available to install." : message,
+                "Invalid release"),
+            AppUpdateCheckState.Failed => (
+                "App update check failed",
+                string.IsNullOrWhiteSpace(message) ? "MetaGrid hit an unexpected app update error." : message,
+                "Failed"),
+            _ => (
+                "App updates not checked yet",
+                "MetaGrid can check GitHub Releases for newer application builds separately from Dota hero-grid updates.",
+                "Not checked")
+        };
+
+    private string FormatInterval(UpdateInterval interval)
         => interval switch
         {
-            UpdateInterval.FifteenMinutes => "15 minutes",
-            UpdateInterval.ThirtyMinutes => "30 minutes",
-            UpdateInterval.OneHour => "1 hour",
-            UpdateInterval.ThreeHours => "3 hours",
-            UpdateInterval.SixHours => "6 hours",
-            UpdateInterval.TwelveHours => "12 hours",
-            UpdateInterval.TwentyFourHours => "24 hours",
-            _ => $"{(int)interval} minutes"
+            UpdateInterval.FifteenMinutes => _text.T("15 minutes", "15 минут"),
+            UpdateInterval.ThirtyMinutes => _text.T("30 minutes", "30 минут"),
+            UpdateInterval.OneHour => _text.T("1 hour", "1 час"),
+            UpdateInterval.ThreeHours => _text.T("3 hours", "3 часа"),
+            UpdateInterval.SixHours => _text.T("6 hours", "6 часов"),
+            UpdateInterval.TwelveHours => _text.T("12 hours", "12 часов"),
+            UpdateInterval.TwentyFourHours => _text.T("24 hours", "24 часа"),
+            _ => _text.T($"{(int)interval} minutes", $"{(int)interval} минут")
         };
+
+    private void RefreshLocalizedBindings()
+    {
+        UpdateIntervalOptions =
+        [
+            new UpdateIntervalOption(UpdateInterval.FifteenMinutes, FormatInterval(UpdateInterval.FifteenMinutes)),
+            new UpdateIntervalOption(UpdateInterval.ThirtyMinutes, FormatInterval(UpdateInterval.ThirtyMinutes)),
+            new UpdateIntervalOption(UpdateInterval.OneHour, FormatInterval(UpdateInterval.OneHour)),
+            new UpdateIntervalOption(UpdateInterval.ThreeHours, FormatInterval(UpdateInterval.ThreeHours)),
+            new UpdateIntervalOption(UpdateInterval.SixHours, FormatInterval(UpdateInterval.SixHours)),
+            new UpdateIntervalOption(UpdateInterval.TwelveHours, FormatInterval(UpdateInterval.TwelveHours)),
+            new UpdateIntervalOption(UpdateInterval.TwentyFourHours, FormatInterval(UpdateInterval.TwentyFourHours))
+        ];
+        LastCheckedText = FormatDashboardTimestamp(_settings.LastCheckAt);
+        LastUpdatedText = FormatDashboardTimestamp(_settings.LastSuccessfulUpdateAt);
+        PersonalizationLastRefreshText = FormatDashboardTimestamp(_settings.LastSuccessfulPersonalStatsRefreshAt);
+        CurrentSourceText = BuildSourceStatusText();
+        if (!_settings.AutoUpdateEnabled)
+        {
+            NextCheckText = _text.T("Automatic updates disabled", "Автообновления отключены");
+        }
+        else if (_settings.LastCheckAt is not null || _settings.LastSuccessfulLiveProviderCheckAt is not null)
+        {
+            NextCheckText = FormatSchedulerTimestamp(AutomaticUpdateStartupPolicy.ComputeNextScheduledCheckAt(_appClock.Now, _settings.UpdateInterval));
+        }
+
+        RaisePropertyChanged(nameof(UpdateIntervalOptions));
+        RaisePropertyChanged(nameof(StatusTitle));
+        RaisePropertyChanged(nameof(StatusText));
+        RaisePropertyChanged(nameof(AppUpdateStatusTitle));
+        RaisePropertyChanged(nameof(AppUpdateStatusText));
+        RaisePropertyChanged(nameof(AppUpdateChipText));
+        RaisePropertyChanged(nameof(AppUpdateLastCheckedText));
+        RaisePropertyChanged(nameof(AppUpdateAvailableVersionText));
+        RaisePropertyChanged(nameof(CurrentAppVersionText));
+        RaisePropertyChanged(nameof(ProviderStatusText));
+        RaisePropertyChanged(nameof(ProviderCardTitle));
+        RaisePropertyChanged(nameof(SteamDetectionStatusText));
+        RaisePropertyChanged(nameof(SteamDetectionPathText));
+        RaisePropertyChanged(nameof(CurrentSourceText));
+        RaisePropertyChanged(nameof(GridCriteriaText));
+        RaisePropertyChanged(nameof(TopFivePreviewText));
+        RaisePropertyChanged(nameof(StatusChipText));
+        RaisePropertyChanged(nameof(AutoUpdateChipText));
+        RaisePropertyChanged(nameof(ProviderStatusChipText));
+        RaisePropertyChanged(nameof(PersonalizationStatusText));
+        RaisePropertyChanged(nameof(PersonalizationSourceText));
+        RaisePropertyChanged(nameof(PersonalizationDetailsText));
+        RaisePropertyChanged(nameof(PersonalizationConnectedAccountText));
+        RaisePropertyChanged(nameof(PersonalizationLastRefreshText));
+        RaisePropertyChanged(nameof(SettingsSaveStateText));
+        RaisePropertyChanged(nameof(CurrentGridPreviewTitle));
+        RaisePropertyChanged(nameof(CurrentGridPreviewSubtitle));
+        RaisePropertyChanged(nameof(OnboardingTitle));
+        RaisePropertyChanged(nameof(OnboardingDescription));
+        RaisePropertyChanged(nameof(OnboardingPrimaryLabel));
+        RaisePropertyChanged(nameof(OnboardingStepLabel));
+        RaisePropertyChanged(nameof(OnboardingSelectedAccountLabel));
+        RaisePropertyChanged(nameof(OnboardingAccountsHintText));
+        RaisePropertyChanged(nameof(OnboardingAutoUpdateHelpText));
+        RaisePropertyChanged(nameof(OnboardingSummaryText));
+        RaisePropertyChanged(nameof(ShowAppUpdateBanner));
+        RaisePropertyChanged(nameof(HasAppUpdateAvailable));
+        RaisePropertyChanged(nameof(HasDeferredAppUpdate));
+        RaisePropertyChanged(nameof(AppUpdateBannerTitle));
+        RaisePropertyChanged(nameof(AppUpdateBannerText));
+        RaisePropertyChanged(nameof(CheckAppUpdatesLabel));
+        RaisePropertyChanged(nameof(UpdateNowLabel));
+        RaisePropertyChanged(nameof(LaterLabel));
+    }
+
+    private string FormatDashboardTimestamp(DateTimeOffset? value)
+        => value is null
+            ? _text.T("Never", "Никогда")
+            : FormatTimestamp(value.Value.ToLocalTime(), includeLineBreak: true);
+
+    private string FormatInlineTimestamp(DateTimeOffset value)
+        => FormatTimestamp(value.ToLocalTime(), includeLineBreak: false);
+
+    private string FormatSchedulerTimestamp(DateTimeOffset? value)
+        => value is null
+            ? _text.T("Not scheduled", "Не запланировано")
+            : FormatTimestamp(value.Value.ToLocalTime(), includeLineBreak: true);
+
+    private string FormatTimestamp(DateTimeOffset localValue, bool includeLineBreak)
+    {
+        var culture = _text.Language == AppLanguage.Russian
+            ? CultureInfo.GetCultureInfo("ru-RU")
+            : CultureInfo.GetCultureInfo("en-US");
+        var separator = includeLineBreak ? Environment.NewLine : " ";
+        var format = _text.Language == AppLanguage.Russian
+            ? $"dd.MM.yyyy{separator}HH:mm"
+            : $"MMM d, yyyy{separator}h:mm tt";
+        return localValue.ToString(format, culture);
+    }
 
     private static string? ToShortHash(string? hash)
         => string.IsNullOrWhiteSpace(hash) ? null : hash[..Math.Min(12, hash.Length)];
+
+    private string BuildGridCriteriaText()
+        => _settings.PersonalizationEnabled && GetCurrentPersonalizationAccountContext(_settings).HasAccount
+            ? "Official Dota2ProTracker High Winrate grid + optional MY BEST HEROES row"
+            : "Official Dota2ProTracker High Winrate grid";
+
+    private static MediaBrush CreateBrush(string hex)
+    {
+        var brush = (SolidColorBrush)new BrushConverter().ConvertFromString(hex)!;
+        brush.Freeze();
+        return brush;
+    }
+
+    private void ApplyPersonalizationStateFromSettings()
+    {
+        var status = ParsePersonalizationStatus(_settings.LastPersonalizationStatus);
+        var sourceMode = _settings.PersonalizationAccountSourceMode;
+        var selectedAccount = SelectedAccount;
+        PersonalizationSourceText = sourceMode == PersonalizationAccountSourceMode.ManualAccount
+            ? "Manual OpenDota account"
+            : "Selected Steam account";
+        PersonalizationStatusText = status switch
+        {
+            PersonalizationStatus.Ready => "Personal heroes ready",
+            PersonalizationStatus.NoQualifyingHeroes => "No qualifying heroes in last 90 days",
+            PersonalizationStatus.ProfileUnavailable => "Profile private or match data unavailable",
+            PersonalizationStatus.Cached => "Using cached personal heroes",
+            PersonalizationStatus.OpenDotaUnavailable => "OpenDota unavailable",
+            PersonalizationStatus.InvalidInput => "OpenDota account required",
+            _ => "Personal heroes off"
+        };
+
+        PersonalizationDetailsText = string.IsNullOrWhiteSpace(_settings.LastPersonalizationMessage)
+            ? sourceMode == PersonalizationAccountSourceMode.ManualAccount
+                ? "Enter another OpenDota account only when you want to override the selected Steam account."
+                : "OpenDota automatically uses your selected Steam account to add MY BEST HEROES to the All Roles layout."
+            : _settings.LastPersonalizationMessage;
+        PersonalizationConnectedAccountText = sourceMode == PersonalizationAccountSourceMode.SelectedSteamAccount
+            ? selectedAccount is null
+                ? "Select a Steam account to resolve OpenDota personalization"
+                : $"{selectedAccount.DisplayName} ({selectedAccount.AccountId})"
+            : string.IsNullOrWhiteSpace(_settings.PersonalizationAccountId)
+                ? "No OpenDota account resolved yet"
+                : string.IsNullOrWhiteSpace(_settings.LastPersonalizationAccountDisplayName)
+                    ? _settings.PersonalizationAccountId
+                    : $"{_settings.LastPersonalizationAccountDisplayName} ({_settings.PersonalizationAccountId})";
+        PersonalizationLastRefreshText = FormatDashboardTimestamp(_settings.LastSuccessfulPersonalStatsRefreshAt);
+    }
+
+    private async Task TryLoadPersonalHeroPreviewAsync()
+    {
+        PersonalHeroPreviewItems.Clear();
+        RaisePropertyChanged(nameof(HasPersonalHeroPreview));
+
+        if (string.IsNullOrWhiteSpace(_settings.PersonalizationAccountId))
+        {
+            return;
+        }
+
+        var cache = await _personalHeroCacheService.LoadAsync(_settings.PersonalizationAccountId, _lifetimeCts.Token);
+        if (cache is null)
+        {
+            return;
+        }
+
+        foreach (var hero in cache.SelectedHeroes)
+        {
+            PersonalHeroPreviewItems.Add(new PersonalHeroPreviewItem(hero.HeroName, $"{hero.WinRate:P1} WR - {hero.Games} matches"));
+        }
+
+        RaisePropertyChanged(nameof(HasPersonalHeroPreview));
+    }
+
+    private void ApplyPersonalizationResolution(PersonalizationResolution resolution)
+    {
+        _settings.PersonalizationAccountId = resolution.AccountId;
+        _editableSettings.PersonalizationAccountId = resolution.AccountId;
+
+        _settings.LastPersonalizationStatus = resolution.Status.ToString();
+        _settings.LastPersonalizationMessage = resolution.Message;
+        _settings.LastPersonalizationAccountDisplayName = resolution.DisplayName;
+        if (resolution.Status is PersonalizationStatus.Ready or PersonalizationStatus.NoQualifyingHeroes or PersonalizationStatus.Cached)
+        {
+            _settings.LastSuccessfulPersonalStatsRefreshAt = resolution.FetchedAt ?? _appClock.Now;
+        }
+
+        _editableSettings.LastPersonalizationStatus = _settings.LastPersonalizationStatus;
+        _editableSettings.LastPersonalizationMessage = _settings.LastPersonalizationMessage;
+        _editableSettings.LastPersonalizationAccountDisplayName = _settings.LastPersonalizationAccountDisplayName;
+        _editableSettings.LastSuccessfulPersonalStatsRefreshAt = _settings.LastSuccessfulPersonalStatsRefreshAt;
+        ApplyPersonalizationStateFromSettings();
+
+        PersonalHeroPreviewItems.Clear();
+        foreach (var hero in resolution.Selection?.SelectedHeroes ?? [])
+        {
+            PersonalHeroPreviewItems.Add(new PersonalHeroPreviewItem(hero.HeroName, $"{hero.WinRate:P1} WR - {hero.Games} matches"));
+        }
+
+        RaisePropertyChanged(nameof(HasPersonalHeroPreview));
+        GridCriteriaText = BuildGridCriteriaText();
+    }
+
+    private PersonalizationAccountContext GetCurrentPersonalizationAccountContext(AppSettings settings)
+        => settings.PersonalizationAccountSourceMode == PersonalizationAccountSourceMode.ManualAccount
+            ? new PersonalizationAccountContext
+            {
+                SourceMode = PersonalizationAccountSourceMode.ManualAccount,
+                AccountId = settings.PersonalizationManualAccountId ?? settings.PersonalizationAccountId
+            }
+            : new PersonalizationAccountContext
+            {
+                SourceMode = PersonalizationAccountSourceMode.SelectedSteamAccount,
+                AccountId = SelectedAccount?.AccountId,
+                DisplayName = SelectedAccount?.DisplayName
+            };
+
+    private async Task RecomposeAvailableSnapshotAsync(PersonalizationResolution resolution)
+    {
+        var cachedBaseSnapshot = await _gridSnapshotCacheService.LoadAsync(_lifetimeCts.Token);
+        if (cachedBaseSnapshot is null || ParseOrigin(_settings.LastGridOrigin) == GridOriginKind.Cached)
+        {
+            return;
+        }
+
+        var effective = _personalizedGridComposer.Compose(cachedBaseSnapshot, resolution);
+        _availableInstallSnapshot = effective;
+        _settings.LastBaseSourceHash = cachedBaseSnapshot.Hash;
+        _settings.LastEffectiveGridHash = effective.Hash;
+        _settings.LastRemoteHash = effective.Hash;
+        _settings.LastCachedHash = effective.Hash;
+        AvailableGridHashText = ToShortHash(effective.Hash) ?? "Unknown";
+        CachedGridHashText = ToShortHash(effective.Hash) ?? "Not cached";
+        BaseGridHashText = ToShortHash(cachedBaseSnapshot.Hash) ?? "Unknown";
+        TopFivePreviewText = BuildTopFivePreview(effective);
+        RoleSummaryText = BuildRoleSummary(effective);
+        await UpdateGridPreviewAsync(effective);
+        RefreshOverviewState();
+    }
+
+    private async Task RefreshPersonalizationFromCurrentSelectionAsync(bool forceRefresh, bool notify)
+    {
+        if (!_settings.PersonalizationEnabled)
+        {
+            return;
+        }
+
+        try
+        {
+            var resolution = forceRefresh
+                ? await _personalizationService.RefreshAsync(_settings, GetCurrentPersonalizationAccountContext(_settings), _lifetimeCts.Token)
+                : await _personalizationService.ResolveAsync(_settings, GetCurrentPersonalizationAccountContext(_settings), forceRefresh: false, _lifetimeCts.Token);
+            ApplyPersonalizationResolution(resolution);
+            await RecomposeAvailableSnapshotAsync(resolution);
+            await PersistSettingsAsync(_lifetimeCts.Token);
+            if (notify)
+            {
+                _notificationService.ShowInfo("Personal heroes refreshed", resolution.Message);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            await _loggingService.LogAsync(LogLevelKind.Warning, "Automatic personalization refresh failed.", new { ex.Message }, CancellationToken.None);
+        }
+    }
+
+    private async Task ConnectPersonalizationAsync()
+    {
+        if (string.IsNullOrWhiteSpace(PersonalizationInput))
+        {
+            PersonalizationStatusText = "Profile input invalid";
+            PersonalizationDetailsText = "Enter a numeric account ID or a supported OpenDota/Dotabuff player URL.";
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            var resolution = await _personalizationService.ConnectAsync(PersonalizationInput, _lifetimeCts.Token);
+            if (resolution.Status == PersonalizationStatus.InvalidInput)
+            {
+                PersonalizationStatusText = "Profile input invalid";
+                PersonalizationDetailsText = resolution.Message;
+                return;
+            }
+
+            _settings.PersonalizationEnabled = true;
+            _editableSettings.PersonalizationEnabled = true;
+            _settings.PersonalizationAccountSourceMode = PersonalizationAccountSourceMode.ManualAccount;
+            _editableSettings.PersonalizationAccountSourceMode = PersonalizationAccountSourceMode.ManualAccount;
+            _settings.PersonalizationManualAccountId = resolution.AccountId;
+            _editableSettings.PersonalizationManualAccountId = resolution.AccountId;
+            PersonalizationInput = resolution.AccountId ?? PersonalizationInput;
+            ApplyPersonalizationResolution(resolution);
+            await RecomposeAvailableSnapshotAsync(resolution);
+            await PersistSettingsAsync(_lifetimeCts.Token);
+            ResetEditableSettingsBaseline();
+            _notificationService.ShowSuccess("Personal heroes connected", "MetaGrid connected the OpenDota personalization profile.");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            await _loggingService.LogAsync(LogLevelKind.Error, "OpenDota personalization connect failed.", new { ex.Message }, CancellationToken.None);
+            PersonalizationStatusText = "OpenDota unavailable";
+            PersonalizationDetailsText = ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task RefreshPersonalHeroesAsync()
+    {
+        IsBusy = true;
+        try
+        {
+            var resolution = await _personalizationService.RefreshAsync(_settings, GetCurrentPersonalizationAccountContext(_settings), _lifetimeCts.Token);
+            ApplyPersonalizationResolution(resolution);
+            await RecomposeAvailableSnapshotAsync(resolution);
+            await PersistSettingsAsync(_lifetimeCts.Token);
+            _notificationService.ShowInfo("Personal heroes refreshed", resolution.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task DisconnectPersonalizationAsync()
+    {
+        IsBusy = true;
+        try
+        {
+            await _personalizationService.DisconnectAsync(_settings, _lifetimeCts.Token);
+            _settings.PersonalizationEnabled = false;
+            _settings.PersonalizationAccountId = null;
+            _settings.PersonalizationManualAccountId = null;
+            _settings.PersonalizationAccountSourceMode = PersonalizationAccountSourceMode.SelectedSteamAccount;
+            _settings.LastPersonalizationStatus = PersonalizationStatus.Disabled.ToString();
+            _settings.LastPersonalizationMessage = "Personal heroes are disabled.";
+            _settings.LastPersonalizationAccountDisplayName = null;
+            _editableSettings.PersonalizationEnabled = false;
+            _editableSettings.PersonalizationAccountId = null;
+            _editableSettings.PersonalizationManualAccountId = null;
+            _editableSettings.PersonalizationAccountSourceMode = PersonalizationAccountSourceMode.SelectedSteamAccount;
+            PersonalizationInput = string.Empty;
+            ApplyPersonalizationStateFromSettings();
+            PersonalHeroPreviewItems.Clear();
+            RaisePropertyChanged(nameof(HasPersonalHeroPreview));
+            GridCriteriaText = BuildGridCriteriaText();
+            await RecomposeAvailableSnapshotAsync(new PersonalizationResolution
+            {
+                Status = PersonalizationStatus.Disabled,
+                Message = "Personal heroes are disabled."
+            });
+            await PersistSettingsAsync(_lifetimeCts.Token);
+            ResetEditableSettingsBaseline();
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
 
     private void ResetEditableSettingsBaseline()
     {
@@ -1495,10 +2581,14 @@ public sealed class MainViewModel : ObservableObject
             settings.MinimizeToTray,
             settings.CloseToTray,
             settings.AutoUpdateEnabled,
+            settings.AutomaticallyCheckAppUpdates,
             settings.UpdateInterval,
             Math.Clamp(settings.BackupRetentionCount, 1, 50),
             settings.AutomaticallyDetectSteam,
-            settings.SteamDirectoryOverride?.Trim() ?? string.Empty);
+            settings.SteamDirectoryOverride?.Trim() ?? string.Empty,
+            settings.PersonalizationEnabled,
+            settings.PersonalizationAccountSourceMode,
+            settings.PersonalizationManualAccountId?.Trim() ?? string.Empty);
 
     private Task PersistSettingsAsync(CancellationToken cancellationToken)
     {
@@ -1528,7 +2618,7 @@ public sealed class MainViewModel : ObservableObject
             {
                 nameof(ProviderStatus.Online) => string.Equals(sourceName, "Dota2ProTracker", StringComparison.OrdinalIgnoreCase)
                     ? "D2PT Online"
-                    : "Provider online",
+                    : $"{sourceName ?? "Provider"} Online",
                 nameof(ProviderStatus.Unavailable) => "Source unavailable",
                 nameof(ProviderStatus.CloudflareBlocked) => "D2PT blocked",
                 nameof(ProviderStatus.RateLimited) => "D2PT limited",
@@ -1560,7 +2650,7 @@ public sealed class MainViewModel : ObservableObject
             {
                 ProviderStatus.Online => string.Equals(sourceName, "Dota2ProTracker", StringComparison.OrdinalIgnoreCase)
                     ? "D2PT Online"
-                    : "Provider online",
+                    : $"{sourceName ?? "Provider"} Online",
                 ProviderStatus.Unavailable => "Source unavailable",
                 ProviderStatus.CloudflareBlocked => "D2PT blocked by Cloudflare",
                 ProviderStatus.RateLimited => "Provider rate limited",
@@ -1592,7 +2682,7 @@ public sealed class MainViewModel : ObservableObject
             {
                 nameof(ProviderStatus.Online) => string.Equals(sourceName, "Dota2ProTracker", StringComparison.OrdinalIgnoreCase)
                     ? "D2PT Online"
-                    : "Provider online",
+                    : $"{sourceName ?? "Provider"} Online",
                 nameof(ProviderStatus.Unavailable) => "Source unavailable",
                 nameof(ProviderStatus.CloudflareBlocked) => "D2PT blocked by Cloudflare",
                 nameof(ProviderStatus.RateLimited) => "Provider rate limited",
@@ -1620,6 +2710,9 @@ public sealed class MainViewModel : ObservableObject
 
     private static GridOriginKind? ParseOrigin(string? value)
         => Enum.TryParse<GridOriginKind>(value, out var origin) ? origin : null;
+
+    private static PersonalizationStatus ParsePersonalizationStatus(string? value)
+        => Enum.TryParse<PersonalizationStatus>(value, out var status) ? status : PersonalizationStatus.Disabled;
 
     private static string BuildRoleSummary(HeroGridSnapshot? snapshot)
         => snapshot switch
@@ -1771,7 +2864,7 @@ public sealed class MainViewModel : ObservableObject
         if (result.Trigger != UpdateTriggerKind.ManualInstall)
         {
             _settings.LastCheckAt = _appClock.Now;
-            LastCheckedText = _settings.LastCheckAt?.ToLocalTime().ToString("g") ?? "Never";
+            LastCheckedText = FormatDashboardTimestamp(_settings.LastCheckAt);
         }
 
         if (AutomaticUpdateStartupPolicy.IsSuccessfulLiveProviderCheck(result))
@@ -1787,12 +2880,38 @@ public sealed class MainViewModel : ObservableObject
             CachedGridHashText = ToShortHash(result.GridHash) ?? CachedGridHashText;
         }
 
+        if (!string.IsNullOrWhiteSpace(result.BaseSourceHash))
+        {
+            _settings.LastBaseSourceHash = result.BaseSourceHash;
+            BaseGridHashText = ToShortHash(result.BaseSourceHash) ?? BaseGridHashText;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.EffectiveGridHash))
+        {
+            _settings.LastEffectiveGridHash = result.EffectiveGridHash;
+            _settings.LastRemoteHash = result.EffectiveGridHash;
+            AvailableGridHashText = ToShortHash(result.EffectiveGridHash) ?? AvailableGridHashText;
+        }
+
         _settings.LastProviderStatus = result.ProviderStatus.ToString();
         _settings.LastSourceName = result.SourceName ?? _settings.LastSourceName;
         _settings.LastSourceStrategy = result.SourceStrategy ?? _settings.LastSourceStrategy;
         _settings.LastSourceDetails = result.ProviderMessage ?? _settings.LastSourceDetails;
         _settings.LastGridOrigin = result.OriginKind?.ToString() ?? _settings.LastGridOrigin;
         _settings.LastGridCapturedAt = result.RetrievedAt ?? _settings.LastGridCapturedAt;
+        _settings.LastPersonalizationStatus = result.PersonalizationStatus ?? _settings.LastPersonalizationStatus;
+        _settings.LastPersonalizationMessage = result.PersonalizationMessage ?? _settings.LastPersonalizationMessage;
+        _settings.LastPersonalizationAccountDisplayName = result.PersonalizationAccountDisplayName ?? _settings.LastPersonalizationAccountDisplayName;
+        if (!string.IsNullOrWhiteSpace(result.PersonalizationAccountId))
+        {
+            _settings.PersonalizationAccountId = result.PersonalizationAccountId;
+        }
+
+        if (result.PersonalizationStatus is not null)
+        {
+            ApplyPersonalizationStateFromSettings();
+        }
+
         _availableInstallSnapshot = result.ConfirmedInstallSnapshot?.Snapshot ?? _availableInstallSnapshot;
 
         if (result.ChangedHeroCount > 0)
@@ -1806,13 +2925,14 @@ public sealed class MainViewModel : ObservableObject
         _settings.LastRoleSummary = RoleSummaryText;
         TopFivePreviewText = BuildTopFivePreview(previewSnapshot);
         await UpdateGridPreviewAsync(previewSnapshot);
+        await TryLoadPersonalHeroPreviewAsync();
 
         if (result.Status == UpdateStatus.Updated && !string.IsNullOrWhiteSpace(result.InstalledHash))
         {
             _settings.LastInstalledHash = result.InstalledHash;
             _settings.LastSuccessfulUpdateAt = _appClock.Now;
             InstalledGridHashText = ToShortHash(result.InstalledHash) ?? "Not installed";
-            LastUpdatedText = _settings.LastSuccessfulUpdateAt?.ToLocalTime().ToString("g") ?? LastUpdatedText;
+            LastUpdatedText = FormatDashboardTimestamp(_settings.LastSuccessfulUpdateAt);
         }
         else if (!string.IsNullOrWhiteSpace(result.InstalledHash))
         {
@@ -1825,8 +2945,7 @@ public sealed class MainViewModel : ObservableObject
         }
 
         CurrentSourceText = BuildSourceStatusText();
-        var providerStatusText = ToProviderStatusText(result.ProviderStatus, result.OriginKind, result.SourceName);
-        var providerStatusChipText = ToProviderChipText(result.ProviderStatus.ToString(), result.OriginKind, result.SourceName);
+        GridCriteriaText = BuildGridCriteriaText();
         var statusPresentation = HeroGridStatusPresenter.CreateFromResult(result);
 
         await PersistSettingsAsync(_lifetimeCts.Token);
@@ -1837,13 +2956,17 @@ public sealed class MainViewModel : ObservableObject
             await ScheduleAsync();
         }
 
+        if (SelectedAccount is { } selectedAccount && !string.IsNullOrWhiteSpace(result.TargetPath))
+        {
+            await RefreshSelectedInstalledStateAsync(selectedAccount.Model, result.TargetPath);
+        }
+
         UpdateSelectedAccountUi();
         RefreshOverviewState();
-        ProviderStatusText = providerStatusText;
-        ProviderStatusChipText = providerStatusChipText;
-        StatusTitle = statusPresentation.Title;
-        StatusText = statusPresentation.Description;
-        StatusChipText = statusPresentation.Chip;
+        ProviderStatusText = ToProviderStatusText(result.ProviderStatus, result.OriginKind, result.SourceName);
+        ProviderStatusChipText = ToProviderChipText(result.ProviderStatus.ToString(), result.OriginKind, result.SourceName);
+        ApplyOverviewPresentation(statusPresentation);
+        ApplyProviderVisualState(result.ProviderStatus, result.OriginKind, result.SourceName);
         RaiseInstallActionState();
         RaisePropertyChanged(nameof(OnboardingSummaryText));
 
@@ -1907,18 +3030,19 @@ public sealed class MainViewModel : ObservableObject
     }
 
     private bool DoHashesMatch()
-        => !string.IsNullOrWhiteSpace(_settings.LastRemoteHash)
-           && !string.IsNullOrWhiteSpace(_settings.LastInstalledHash)
-           && string.Equals(_settings.LastRemoteHash, _settings.LastInstalledHash, StringComparison.OrdinalIgnoreCase);
+        => !string.IsNullOrWhiteSpace(_settings.LastEffectiveGridHash ?? _settings.LastRemoteHash)
+           && !string.IsNullOrWhiteSpace(GetSelectedInstalledHash())
+           && string.Equals(_settings.LastEffectiveGridHash ?? _settings.LastRemoteHash, GetSelectedInstalledHash(), StringComparison.OrdinalIgnoreCase);
 
     public InstallGridPreview? BuildInstallPreview()
     {
         var selected = SelectedAccount;
+        var effectiveHash = _settings.LastEffectiveGridHash ?? _settings.LastRemoteHash;
         if (selected is null
-            || string.IsNullOrWhiteSpace(_settings.LastRemoteHash)
+            || string.IsNullOrWhiteSpace(effectiveHash)
             || string.IsNullOrWhiteSpace(selected.Model.DotaConfigDirectory)
             || _availableInstallSnapshot is null
-            || !string.Equals(_availableInstallSnapshot.Hash, _settings.LastRemoteHash, StringComparison.OrdinalIgnoreCase))
+            || !string.Equals(_availableInstallSnapshot.Hash, effectiveHash, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
@@ -1931,6 +3055,12 @@ public sealed class MainViewModel : ObservableObject
             AccountDisplayName = selected.DisplayName,
             TargetPath = targetPath,
             PreparedAt = DateTimeOffset.UtcNow,
+            BaseSourceHash = _settings.LastBaseSourceHash,
+            EffectiveGridHash = effectiveHash,
+            PersonalizationStatus = _settings.LastPersonalizationStatus,
+            PersonalizationMessage = _settings.LastPersonalizationMessage,
+            PersonalizationAccountId = _settings.PersonalizationAccountId,
+            PersonalizationUsedCache = ParsePersonalizationStatus(_settings.LastPersonalizationStatus) == PersonalizationStatus.Cached,
             HeroCount = _settings.LastHeroCount ?? _availableInstallSnapshot.Layouts.SelectMany(layout => layout.Categories).SelectMany(category => category.HeroIds).Distinct().Count(),
             GroupCount = _availableInstallSnapshot.Layouts.SelectMany(layout => layout.Categories).Select(category => category.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
             HasExistingGridFile = File.Exists(targetPath)
@@ -1942,7 +3072,7 @@ public sealed class MainViewModel : ObservableObject
             _settings.LastSourceName ?? "Unknown source",
             installSnapshot.HeroCount,
             installSnapshot.GroupCount,
-            ToShortHash(_settings.LastRemoteHash) ?? _settings.LastRemoteHash,
+            ToShortHash(effectiveHash) ?? effectiveHash,
             targetPath,
             File.Exists(targetPath),
             InstallActionText,
@@ -1963,19 +3093,135 @@ public sealed class MainViewModel : ObservableObject
     private HeroGridInstallActionState GetInstallActionState()
         => HeroGridInstallActionResolver.Resolve(
             SelectedAccount is { Model.DotaConfigDirectory.Length: > 0 },
-            _availableInstallSnapshot is not null && !string.IsNullOrWhiteSpace(_settings.LastRemoteHash)
-                && string.Equals(_availableInstallSnapshot.Hash, _settings.LastRemoteHash, StringComparison.OrdinalIgnoreCase),
-            _settings.LastRemoteHash,
-            _settings.LastInstalledHash,
+            _availableInstallSnapshot is not null && !string.IsNullOrWhiteSpace(_settings.LastEffectiveGridHash ?? _settings.LastRemoteHash)
+                && string.Equals(_availableInstallSnapshot.Hash, _settings.LastEffectiveGridHash ?? _settings.LastRemoteHash, StringComparison.OrdinalIgnoreCase),
+            _settings.LastEffectiveGridHash ?? _settings.LastRemoteHash,
+            GetSelectedInstalledHash(),
             ParseOrigin(_settings.LastGridOrigin));
 
     private void RefreshOverviewState()
     {
-        var presentation = HeroGridStatusPresenter.CreateOverview(_settings, Accounts.Count > 0);
+        SyncSelectedInstalledStateToSettings();
+        var presentation = HeroGridStatusPresenter.CreateOverview(
+            _settings,
+            Accounts.Count > 0,
+            GetSelectedInstalledState(),
+            GetSelectedInstalledHash());
+        ApplyOverviewPresentation(presentation);
+        ApplyProviderVisualState(_settings.LastProviderStatus, ParseOrigin(_settings.LastGridOrigin), _settings.LastSourceName);
+        RaiseInstallActionState();
+    }
+
+    private void ApplyOverviewPresentation(HeroGridStatusPresentation presentation)
+    {
+        _overviewState = presentation.State;
         StatusTitle = presentation.Title;
         StatusText = presentation.Description;
         StatusChipText = presentation.Chip;
-        RaiseInstallActionState();
+
+        switch (presentation.State)
+        {
+            case HeroGridOverviewState.GridInstalled:
+                StatusChipBackgroundBrush = CreateBrush("#1D2A22");
+                StatusChipBorderBrush = CreateBrush("#355340");
+                break;
+            case HeroGridOverviewState.UpdateAvailable:
+            case HeroGridOverviewState.GridReadyToInstall:
+            case HeroGridOverviewState.CachedData:
+                StatusChipBackgroundBrush = CreateBrush("#2C2417");
+                StatusChipBorderBrush = CreateBrush("#5A4727");
+                break;
+            case HeroGridOverviewState.SourceUnavailable:
+            case HeroGridOverviewState.NeedsReview:
+            case HeroGridOverviewState.UpdateCheckFailed:
+            case HeroGridOverviewState.AutomaticUpdateFailed:
+            case HeroGridOverviewState.RestoreFailed:
+                StatusChipBackgroundBrush = CreateBrush("#2D1E1E");
+                StatusChipBorderBrush = CreateBrush("#5A3636");
+                break;
+            default:
+                StatusChipBackgroundBrush = CreateBrush("#262626");
+                StatusChipBorderBrush = CreateBrush("#343434");
+                break;
+        }
+    }
+
+    private void ApplyProviderVisualState(ProviderStatus providerStatus, GridOriginKind? originKind, string? sourceName)
+    {
+        var chip = ToProviderChipText(providerStatus.ToString(), originKind, sourceName);
+        ApplyProviderVisualState(chip);
+    }
+
+    private void ApplyProviderVisualState(string? providerStatus, GridOriginKind? originKind, string? sourceName)
+    {
+        var chip = ToProviderChipText(providerStatus, originKind, sourceName);
+        ApplyProviderVisualState(chip);
+    }
+
+    private void ApplyProviderVisualState(string providerChip)
+    {
+        switch (providerChip)
+        {
+            case "D2PT Online":
+                ProviderStatusChipBackgroundBrush = CreateBrush("#1D2A22");
+                ProviderStatusChipBorderBrush = CreateBrush("#355340");
+                ProviderIndicatorBrush = CreateBrush("#84CC9A");
+                break;
+            case "Using cached grid":
+            case "D2PT blocked":
+            case "D2PT limited":
+            case "Network issue":
+                ProviderStatusChipBackgroundBrush = CreateBrush("#2C2417");
+                ProviderStatusChipBorderBrush = CreateBrush("#5A4727");
+                ProviderIndicatorBrush = CreateBrush("#D8B26A");
+                break;
+            case "Source unavailable":
+            case "Unexpected response":
+            case "Payload invalid":
+            default:
+                if (providerChip.EndsWith("Online", StringComparison.OrdinalIgnoreCase))
+                {
+                    ProviderStatusChipBackgroundBrush = CreateBrush("#1D2A22");
+                    ProviderStatusChipBorderBrush = CreateBrush("#355340");
+                    ProviderIndicatorBrush = CreateBrush("#84CC9A");
+                }
+                else
+                {
+                    ProviderStatusChipBackgroundBrush = CreateBrush("#2D1E1E");
+                    ProviderStatusChipBorderBrush = CreateBrush("#5A3636");
+                    ProviderIndicatorBrush = CreateBrush(providerChip == "Source not checked" ? "#858585" : "#D37C7C");
+                }
+                break;
+        }
+    }
+
+    private string? GetSelectedInstalledHash()
+        => SelectedAccount?.Model.CurrentMetaGridHash;
+
+    private InstalledMetaGridState GetSelectedInstalledState()
+        => SelectedAccount?.Model.InstalledMetaGridState ?? InstalledMetaGridState.Unknown;
+
+    private void SyncSelectedInstalledStateToSettings()
+    {
+        var selected = SelectedAccount?.Model;
+        if (selected is null)
+        {
+            _settings.LastInstalledHash = null;
+            return;
+        }
+
+        _settings.LastInstalledHash = selected.InstalledMetaGridState == InstalledMetaGridState.Present
+            ? selected.CurrentMetaGridHash
+            : null;
+    }
+
+    private async Task RefreshSelectedInstalledStateAsync(SteamAccount account, string targetPath)
+    {
+        var inspection = await _dotaGridService.InspectInstalledMetaGridAsync(targetPath, _lifetimeCts.Token);
+        account.HasHeroGridConfig = inspection.State is not InstalledMetaGridState.MissingFile;
+        account.CurrentMetaGridHash = inspection.InstalledHash;
+        account.InstalledMetaGridState = inspection.State;
+        account.InstalledMetaGridError = inspection.Error;
     }
 
     private sealed record AutomaticCycleInputs(
@@ -1986,6 +3232,11 @@ public sealed class MainViewModel : ObservableObject
 }
 
 public sealed record UpdateIntervalOption(UpdateInterval Value, string Label)
+{
+    public override string ToString() => Label;
+}
+
+public sealed record PersonalizationSourceModeOption(PersonalizationAccountSourceMode Value, string Label)
 {
     public override string ToString() => Label;
 }
@@ -2055,6 +3306,18 @@ public sealed class HeroGridCategoryPreview
     public int HeroCount { get; }
     public string HeroPreviewText { get; }
     public string HeroCountText => $"{HeroCount} {(HeroCount == 1 ? "hero" : "heroes")}";
+}
+
+public sealed class PersonalHeroPreviewItem
+{
+    public PersonalHeroPreviewItem(string heroName, string statLine)
+    {
+        HeroName = heroName;
+        StatLine = statLine;
+    }
+
+    public string HeroName { get; }
+    public string StatLine { get; }
 }
 
 public sealed record InstallGridPreview(

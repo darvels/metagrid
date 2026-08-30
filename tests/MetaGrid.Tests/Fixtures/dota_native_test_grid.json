@@ -1,0 +1,42 @@
+{
+  "version": 3,
+  "configs": [
+    {
+      "config_name": "TEST",
+      "categories": [
+        {
+          "category_name": "Strength",
+          "x_position": 0.0,
+          "y_position": 0.0,
+          "width": 313.043488,
+          "height": 504.782623,
+          "hero_ids": [73, 2, 99, 96, 81, 51]
+        },
+        {
+          "category_name": "Agility",
+          "x_position": 343.478271,
+          "y_position": 0.0,
+          "width": 313.043488,
+          "height": 504.782623,
+          "hero_ids": [1, 48, 67, 44, 41, 93]
+        },
+        {
+          "category_name": "Intelligence",
+          "x_position": 686.956543,
+          "y_position": 0.0,
+          "width": 313.043488,
+          "height": 504.782623,
+          "hero_ids": [5, 64, 43, 52, 90, 111]
+        },
+        {
+          "category_name": "Universal",
+          "x_position": 1030.434814,
+          "y_position": 0.0,
+          "width": 313.043488,
+          "height": 504.782623,
+          "hero_ids": [126, 128, 129, 131, 135, 145]
+        }
+      ]
+    }
+  ]
+}

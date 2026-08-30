@@ -110,6 +110,23 @@ public sealed class CanonicalHeroGridCategory
     public double Height { get; init; }
 }
 
+public sealed class InstalledMetaGridInspectionResult
+{
+    public InstalledMetaGridState State { get; init; } = InstalledMetaGridState.Unknown;
+    public string? InstalledHash { get; init; }
+    public string? Error { get; init; }
+    public int ManagedLayoutCount { get; init; }
+    public int ManagedCategoryCount { get; init; }
+    public bool HasAllRoleLayout { get; init; }
+    public bool HasRoleSpecificLayouts { get; init; }
+}
+
+public sealed class NativeGridStructureValidationResult
+{
+    public bool IsValid { get; init; }
+    public string? Error { get; init; }
+}
+
 public sealed class InstallGridSnapshot
 {
     public required HeroGridSnapshot Snapshot { get; init; }
@@ -117,6 +134,12 @@ public sealed class InstallGridSnapshot
     public required string AccountDisplayName { get; init; }
     public required string TargetPath { get; init; }
     public required DateTimeOffset PreparedAt { get; init; }
+    public string? BaseSourceHash { get; init; }
+    public string? EffectiveGridHash { get; init; }
+    public string? PersonalizationStatus { get; init; }
+    public string? PersonalizationMessage { get; init; }
+    public string? PersonalizationAccountId { get; init; }
+    public bool PersonalizationUsedCache { get; init; }
     public int HeroCount { get; init; }
     public int GroupCount { get; init; }
     public bool HasExistingGridFile { get; init; }
