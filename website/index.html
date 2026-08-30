@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MetaGrid - Automatic Dota 2 Hero Grid Updater</title>
+  <meta id="meta-description" name="description" content="MetaGrid is a free Windows app for Dota 2 that keeps your hero grid synchronized with current Dota2ProTracker High Winrate data and can add a MY BEST HEROES row from OpenDota statistics.">
+  <meta name="theme-color" content="#111111">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://darvels.github.io/metagrid/">
+  <meta property="og:type" content="website">
+  <meta id="og-title" property="og:title" content="MetaGrid - Automatic Dota 2 Hero Grid Updater">
+  <meta id="og-description" property="og:description" content="Automatic Dota 2 hero grid updates, Dota2ProTracker High Winrate data, and optional MY BEST HEROES personalization.">
+  <meta property="og:url" content="https://darvels.github.io/metagrid/">
+  <meta property="og:site_name" content="MetaGrid">
+  <meta property="og:image" content="https://darvels.github.io/metagrid/assets/screenshots/app-hero-grid-en.png">
+  <meta id="og-image-alt" property="og:image:alt" content="Real MetaGrid desktop app screenshot showing the current Hero Grid view.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta id="twitter-title" name="twitter:title" content="MetaGrid - Automatic Dota 2 Hero Grid Updater">
+  <meta id="twitter-description" name="twitter:description" content="Free Windows x64 app for Dota 2 hero grid updates and optional OpenDota-based personalization.">
+  <meta name="twitter:image" content="https://darvels.github.io/metagrid/assets/screenshots/app-hero-grid-en.png">
+  <meta id="twitter-image-alt" name="twitter:image:alt" content="Real MetaGrid desktop app screenshot showing the current Hero Grid view.">
+  <link rel="icon" href="assets/metagrid.ico" sizes="any">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="MetaGrid home">
+        <img src="assets/metagrid.ico" alt="" width="28" height="28">
+        <span>MetaGrid</span>
+      </a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu" data-i18n="nav.menu" data-i18n-attr="aria-label">
+        <span class="menu-toggle__bar"></span>
+        <span class="menu-toggle__bar"></span>
+        <span class="menu-toggle__bar"></span>
+        <span class="sr-only" data-i18n="nav.menu">Menu</span>
+      </button>
+      <nav id="site-nav" class="site-nav" aria-label="Primary" data-i18n="nav.primaryLabel" data-i18n-attr="aria-label">
+        <a href="#features" data-i18n="nav.features">Features</a>
+        <a href="#how-it-works" data-i18n="nav.how">How It Works</a>
+        <a href="#best-heroes" data-i18n="nav.best">MY BEST HEROES</a>
+        <a href="#faq" data-i18n="nav.faq">FAQ</a>
+        <a href="https://github.com/darvels/metagrid" target="_blank" rel="noopener noreferrer" data-i18n="nav.github">GitHub</a>
+        <div class="lang-switch" aria-label="Language selector" data-i18n="nav.languageLabel" data-i18n-attr="aria-label">
+          <button class="lang-switch__button is-active" type="button" data-lang="en">EN</button>
+          <button class="lang-switch__button" type="button" data-lang="ru">RU</button>
+        </div>
+        <a class="button button--primary button--small" href="https://github.com/darvels/metagrid/releases/latest" target="_blank" rel="noopener noreferrer" data-i18n="nav.download">Download</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero section">
+        <div class="hero__content">
+          <p class="eyebrow" data-i18n="hero.eyebrow">Free Windows app for Dota 2 players</p>
+          <h1 data-i18n="hero.title">A smarter hero grid for Dota 2</h1>
+          <p class="hero__lede" data-i18n="hero.lede">
+            MetaGrid keeps your custom Dota 2 hero grid synchronized with current Dota2ProTracker High Winrate data and can add a personalized MY BEST HEROES row from your public OpenDota statistics.
+          </p>
+          <div class="hero__meta">
+            <span class="chip"><strong data-i18n="hero.versionLabel">Latest version</strong> <span id="latest-version">v0.1.1</span></span>
+            <span class="chip" data-i18n="hero.windows">Windows x64</span>
+            <span class="chip" data-i18n="hero.free">Free &amp; Open Source</span>
+          </div>
+          <div class="hero__actions">
+            <a class="button button--primary" href="https://github.com/darvels/metagrid/releases/latest" target="_blank" rel="noopener noreferrer" data-i18n="hero.primary">Download for Windows</a>
+            <a class="button button--ghost" href="https://github.com/darvels/metagrid" target="_blank" rel="noopener noreferrer" data-i18n="hero.secondary">View on GitHub</a>
+          </div>
+          <div class="hero__status-grid">
+            <article class="status-card">
+              <span class="status-card__label" data-i18n="hero.cardSourceLabel">Grid source</span>
+              <strong data-i18n="hero.cardSourceValue">Official Dota2ProTracker High Winrate</strong>
+            </article>
+            <article class="status-card">
+              <span class="status-card__label" data-i18n="hero.cardAutoLabel">Stays current</span>
+              <strong data-i18n="hero.cardAutoValue">Automatic grid checks and updates</strong>
+            </article>
+            <article class="status-card">
+              <span class="status-card__label" data-i18n="hero.cardUpdateLabel">App updates</span>
+              <strong data-i18n="hero.cardUpdateValue">Built-in updater since v0.1.1</strong>
+            </article>
+          </div>
+        </div>
+        <div class="hero__visual">
+          <div class="hero__visual-frame">
+            <img src="assets/screenshots/app-hero-grid-en.png" alt="Real MetaGrid desktop app screenshot showing the current Hero Grid view." data-i18n="hero.imageAlt" data-i18n-attr="alt" width="1280" height="820" fetchpriority="high" decoding="async">
+          </div>
+          <div class="hero__caption">
+            <span class="live-dot"></span>
+            <span data-i18n="hero.caption">Real MetaGrid screenshot from the desktop app</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="trust-strip section">
+        <article class="mini-card">
+          <strong data-i18n="trust.1title">Dota2ProTracker Data</strong>
+          <p data-i18n="trust.1body">Built around the official High Winrate grid.</p>
+        </article>
+        <article class="mini-card">
+          <strong data-i18n="trust.2title">Automatic Grid Updates</strong>
+          <p data-i18n="trust.2body">Checks for changes and keeps the managed grid current.</p>
+        </article>
+        <article class="mini-card">
+          <strong data-i18n="trust.3title">MY BEST HEROES</strong>
+          <p data-i18n="trust.3body">Optional personalization from public OpenDota stats.</p>
+        </article>
+        <article class="mini-card">
+          <strong data-i18n="trust.4title">Safe Backups</strong>
+          <p data-i18n="trust.4body">Backup, verification, and rollback safeguards included.</p>
+        </article>
+        <article class="mini-card">
+          <strong data-i18n="trust.5title">Open Source</strong>
+          <p data-i18n="trust.5body">Free Windows x64 release under MPL-2.0.</p>
+        </article>
+        <article class="mini-card">
+          <strong data-i18n="trust.6title">EN / RU</strong>
+          <p data-i18n="trust.6body">English and Russian interface support in the app and site.</p>
+        </article>
+      </section>
+
+      <section id="features" class="section">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="features.eyebrow">Why players use MetaGrid</p>
+          <h2 data-i18n="features.title">Built for practical updates, not manual hero-grid busywork</h2>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <h3 data-i18n="features.aTitle">Current Meta Grid</h3>
+            <p data-i18n="features.aBody">Retrieves the official Dota2ProTracker High Winrate grid and keeps the MetaGrid-managed layout synchronized when the source changes.</p>
+          </article>
+          <article class="feature-card feature-card--highlight">
+            <h3 data-i18n="features.bTitle">MY BEST HEROES</h3>
+            <p data-i18n="features.bBody">Adds up to seven qualifying heroes from your public OpenDota match statistics: last 90 days, 10+ games, 53%+ win rate.</p>
+            <p class="feature-card__note" data-i18n="features.bNote">Public match data is required. Private or unavailable OpenDota statistics simply disable personalization while the standard grid still works normally.</p>
+          </article>
+          <article class="feature-card">
+            <h3 data-i18n="features.cTitle">Automatic Grid Updates</h3>
+            <p data-i18n="features.cBody">Checks for updated Dota2ProTracker data and can keep the selected Dota grid current on a schedule.</p>
+          </article>
+          <article class="feature-card">
+            <h3 data-i18n="features.dTitle">Safe Installation</h3>
+            <p data-i18n="features.dBody">Preserves unrelated custom grids and uses backup, verification, and rollback safeguards around managed writes.</p>
+          </article>
+          <article class="feature-card">
+            <h3 data-i18n="features.eTitle">Built-in MetaGrid Updates</h3>
+            <p data-i18n="features.eBody">Starting with v0.1.1, MetaGrid can check for new application releases and install compatible updates through its built-in updater.</p>
+          </article>
+          <article class="feature-card">
+            <h3 data-i18n="features.fTitle">English / Russian UI</h3>
+            <p data-i18n="features.fBody">The app supports both English and Russian, making setup and maintenance easier for more players.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="best-heroes" class="section showcase">
+        <div class="showcase__copy">
+          <p class="eyebrow" data-i18n="best.eyebrow">Personalization</p>
+          <h2 data-i18n="best.title">MY BEST HEROES turns public match history into a focused personal row</h2>
+          <p data-i18n="best.body">When public OpenDota statistics are available, MetaGrid can analyze the last 90 days and add up to seven qualifying heroes directly into the All Roles layout.</p>
+          <ul class="rules-list" aria-label="MY BEST HEROES rules">
+            <li data-i18n="best.rule1">Last 90 days</li>
+            <li data-i18n="best.rule2">10+ matches</li>
+            <li data-i18n="best.rule3">53%+ win rate</li>
+            <li data-i18n="best.rule4">Up to 7 heroes</li>
+          </ul>
+          <p class="showcase__note" data-i18n="best.note">If profile statistics are private or unavailable through OpenDota, MetaGrid still works normally with the standard Dota2ProTracker grid. Only the personalized row is skipped.</p>
+        </div>
+        <div class="showcase__visual">
+          <div class="showcase__visual-grid">
+            <div class="showcase__panel showcase__panel--primary">
+              <img src="assets/screenshots/app-dashboard-en.png" alt="Real MetaGrid desktop app screenshot showing the Dashboard view with update status, selected account, and automation controls." data-i18n="best.dashboardAlt" data-i18n-attr="alt" width="1280" height="820" loading="lazy" decoding="async">
+            </div>
+            <div class="showcase__panel showcase__panel--secondary">
+              <img src="assets/screenshots/app-accounts-en.png" alt="Real MetaGrid desktop app screenshot showing MetaGrid's Steam account selection and detection view." data-i18n="best.accountsAlt" data-i18n-attr="alt" width="1280" height="820" loading="lazy" decoding="async">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="how-it-works" class="section">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="how.eyebrow">How it works</p>
+          <h2 data-i18n="how.title">From download to synchronized grid in three steps</h2>
+        </div>
+        <div class="steps-grid">
+          <article class="step-card">
+            <span class="step-number">01</span>
+            <h3 data-i18n="how.step1Title">Download MetaGrid</h3>
+            <p data-i18n="how.step1Body">Install the latest Windows x64 release from GitHub Releases.</p>
+          </article>
+          <article class="step-card">
+            <span class="step-number">02</span>
+            <h3 data-i18n="how.step2Title">Select your Steam account</h3>
+            <p data-i18n="how.step2Body">MetaGrid locates supported Dota 2 account and grid paths for the selected user.</p>
+          </article>
+          <article class="step-card">
+            <span class="step-number">03</span>
+            <h3 data-i18n="how.step3Title">Install and stay updated</h3>
+            <p data-i18n="how.step3Body">Install the current grid and let MetaGrid keep it synchronized. If public OpenDota data is available, MY BEST HEROES is composed into the All Roles layout.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section updater">
+        <div class="updater__copy">
+          <p class="eyebrow" data-i18n="updater.eyebrow">Application updates</p>
+          <h2 data-i18n="updater.title">MetaGrid now keeps itself updated too</h2>
+          <p data-i18n="updater.body">Version 0.1.1 adds a built-in updater that checks GitHub Releases, verifies downloads with SHA-256, and uses a separate updater flow for safer replacement and rollback.</p>
+          <p class="updater__note" data-i18n="updater.note">If you are on v0.1.0, download v0.1.1 manually once. Future compatible versions can then be installed from inside MetaGrid.</p>
+          <details class="details-card">
+            <summary data-i18n="updater.detailsLabel">Security details</summary>
+            <p data-i18n="updater.detailsBody">The primary user-facing flow stays simple, while the updater performs verification before replacement and supports safer staged recovery if something goes wrong.</p>
+          </details>
+        </div>
+        <div class="updater__visual">
+          <img src="assets/screenshots/app-settings-en.png" alt="Real MetaGrid desktop app screenshot showing the Settings view with automatic updates, backup retention, and startup options." data-i18n="updater.settingsAlt" data-i18n-attr="alt" width="1280" height="820" loading="lazy" decoding="async">
+        </div>
+      </section>
+
+      <section class="section download-cta">
+        <div class="download-cta__content">
+          <p class="eyebrow" data-i18n="download.eyebrow">Download</p>
+          <h2 data-i18n="download.title">Download MetaGrid for Windows</h2>
+          <p data-i18n="download.body">Start with the latest release and keep both the app and your managed Dota 2 hero grid up to date from one place.</p>
+          <div class="download-facts">
+            <span class="download-facts__item">
+              <strong class="download-facts__label" data-i18n="download.versionLabel">Latest version:</strong>
+              <span class="download-facts__value" id="latest-version-secondary">v0.1.1</span>
+            </span>
+            <span class="download-facts__item">
+              <strong class="download-facts__label" data-i18n="download.platformLabel">Platform:</strong>
+              <span class="download-facts__value" data-i18n="download.platformValue">Windows x64</span>
+            </span>
+            <span class="download-facts__item">
+              <strong class="download-facts__label" data-i18n="download.priceLabel">Price:</strong>
+              <span class="download-facts__value" data-i18n="download.priceValue">Free</span>
+            </span>
+            <span class="download-facts__item">
+              <strong class="download-facts__label" data-i18n="download.licenseLabel">License:</strong>
+              <span class="download-facts__value">MPL-2.0</span>
+            </span>
+          </div>
+          <div class="download-actions">
+            <a class="button button--primary" href="https://github.com/darvels/metagrid/releases/latest" target="_blank" rel="noopener noreferrer" data-i18n="download.primary">Download MetaGrid</a>
+            <a class="button button--ghost button--secondary-compact" href="https://github.com/darvels/metagrid" target="_blank" rel="noopener noreferrer" data-i18n="download.secondary">View on GitHub</a>
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" class="section">
+        <div class="section-heading">
+          <p class="eyebrow" data-i18n="faq.eyebrow">FAQ</p>
+          <h2 data-i18n="faq.title">Questions people ask before installing</h2>
+        </div>
+        <div class="faq-list">
+          <details class="faq-item">
+            <summary data-i18n="faq.q1">What is MetaGrid?</summary>
+            <p data-i18n="faq.a1">MetaGrid is a free Windows app for Dota 2 that keeps a managed hero grid synchronized with current Dota2ProTracker High Winrate data.</p>
+          </details>
+          <details class="faq-item">
+            <summary data-i18n="faq.q2">Is MetaGrid free?</summary>
+            <p data-i18n="faq.a2">Yes. MetaGrid is free and open source under the MPL-2.0 license.</p>
+          </details>
+          <details class="faq-item">
+            <summary data-i18n="faq.q3">Does it modify my existing custom grids?</summary>
+            <p data-i18n="faq.a3">MetaGrid preserves unrelated custom grids where supported and wraps managed changes with backup, verification, and rollback safeguards.</p>
+          </details>
+          <details class="faq-item">
+            <summary data-i18n="faq.q4">Where does the meta data come from?</summary>
+            <p data-i18n="faq.a4">The primary source is the official Dota2ProTracker High Winrate hero grid.</p>
+          </details>
+          <details class="faq-item">
+            <summary data-i18n="faq.q5">How does MY BEST HEROES work?</summary>
+            <p data-i18n="faq.a5">It uses public OpenDota statistics from the last 90 days and includes heroes with at least 10 games and at least 53% win rate, up to a maximum of seven.</p>
+          </details>
+          <details class="faq-item">
+            <summary data-i18n="faq.q6">Why is MY BEST HEROES not appearing?</summary>
+            <p data-i18n="faq.a6">Most often, public match data is unavailable or does not meet the qualification rules. The normal Dota2ProTracker-based grid still works either way.</p>
+          </details>
+          <details class="faq-item">
+            <summary data-i18n="faq.q7">Does my Dota profile need to be public?</summary>
+            <p data-i18n="faq.a7">Public or otherwise available OpenDota match statistics are required only for the personalized MY BEST HEROES row.</p>
+          </details>
+          <details class="faq-item">
+            <summary data-i18n="faq.q8">Do I need an OpenDota account?</summary>
+            <p data-i18n="faq.a8">No separate OpenDota account is required. MetaGrid only needs public player statistics to be available through OpenDota.</p>
+          </details>
+          <details class="faq-item">
+            <summary data-i18n="faq.q9">Does MetaGrid update automatically?</summary>
+            <p data-i18n="faq.a9">Yes. MetaGrid can check for updated Dota2ProTracker grid data and keep the selected managed grid current on a schedule.</p>
+          </details>
+          <details class="faq-item">
+            <summary data-i18n="faq.q10">Does MetaGrid itself update automatically?</summary>
+            <p data-i18n="faq.a10">Starting with v0.1.1, MetaGrid includes a built-in application updater. Users on v0.1.0 need to install v0.1.1 manually once first.</p>
+          </details>
+          <details class="faq-item">
+            <summary data-i18n="faq.q11">Do I need to install .NET?</summary>
+            <p data-i18n="faq.a11">No separate .NET installation is required for the packaged v0.1.1 Windows x64 release.</p>
+          </details>
+          <details class="faq-item">
+            <summary data-i18n="faq.q12">What Windows setup is supported?</summary>
+            <p data-i18n="faq.a12">MetaGrid is packaged for Windows x64. The repository also lists Microsoft Edge WebView2 Runtime as a system requirement.</p>
+          </details>
+          <details class="faq-item">
+            <summary data-i18n="faq.q13">Is the source code public?</summary>
+            <p data-i18n="faq.a13">Yes. The source is published at github.com/darvels/metagrid, and issues and feature requests are welcome there.</p>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div>
+        <strong>MetaGrid</strong>
+        <p data-i18n="footer.disclaimer">Independent community project for Dota 2 players. Not affiliated with or endorsed by Valve, Dota 2, Dota2ProTracker, or OpenDota.</p>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/darvels/metagrid" target="_blank" rel="noopener noreferrer" data-i18n="footer.github">GitHub</a>
+        <a href="https://github.com/darvels/metagrid/releases/latest" target="_blank" rel="noopener noreferrer" data-i18n="footer.release">Latest Release</a>
+        <a href="https://github.com/darvels/metagrid/issues" target="_blank" rel="noopener noreferrer" data-i18n="footer.issues">Issues / Bug Reports</a>
+        <a href="https://github.com/darvels/metagrid/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MPL-2.0</a>
+      </div>
+      <p class="site-footer__copy">Copyright (c) 2026 Darvel</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
