@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.1.1'
+    [string]$Version = '0.2.0'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,7 +32,7 @@ function Remove-ReleaseDirectory {
 
     $resolved = (Resolve-Path $PathToRemove).Path
     $allowedRoot = (Resolve-Path $releaseRoot).Path
-    if (-not $resolved.StartsWith($allowedRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if (-not $resolved.StartsWith($allowedRoot + [IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "Refusing to remove path outside artifacts/release: $resolved"
     }
 
@@ -51,7 +51,11 @@ if (Test-Path $shaPath) {
 }
 
 Write-Host "Running tests..."
-dotnet test $testProject -c Release
+dotnet test $testProject -c Release --blame-hang-timeout 30s
+if ($LASTEXITCODE -ne 0) { throw 'Release test gate failed.' }
+
+dotnet build (Join-Path $projectRoot 'MetaGrid.sln') -c Release -m:1 --no-restore
+if ($LASTEXITCODE -ne 0) { throw 'Release build gate failed.' }
 
 Write-Host "Publishing MetaGrid Release win-x64..."
 dotnet publish $uiProject `
@@ -62,6 +66,7 @@ dotnet publish $uiProject `
     /p:PublishSingleFile=true `
     /p:DebugSymbols=false `
     /p:DebugType=None
+if ($LASTEXITCODE -ne 0) { throw 'UI publish failed.' }
 
 Write-Host "Publishing MetaGrid updater helper..."
 dotnet publish $updaterProject `
@@ -72,6 +77,7 @@ dotnet publish $updaterProject `
     /p:PublishSingleFile=true `
     /p:DebugSymbols=false `
     /p:DebugType=None
+if ($LASTEXITCODE -ne 0) { throw 'Updater publish failed.' }
 
 New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 

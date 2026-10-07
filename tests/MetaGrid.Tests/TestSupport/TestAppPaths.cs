@@ -18,6 +18,7 @@ internal sealed class TestAppPaths(string root) : IAppPaths
     public string D2ptCacheDirectory => Path.Combine(CacheDirectory, "D2PT");
     public string D2ptTempDirectory => Path.Combine(D2ptCacheDirectory, "Temp");
     public string D2ptWebView2ProfileDirectory => Path.Combine(_root, "WebView2", "D2PT");
+    public string GuideCacheDirectory => Path.Combine(CacheDirectory, "Guides");
     public string AppUpdateDirectory => Path.Combine(_root, "AppUpdate");
     public string AppUpdateSessionDirectory => Path.Combine(AppUpdateDirectory, "Sessions");
 }

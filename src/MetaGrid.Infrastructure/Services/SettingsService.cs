@@ -113,6 +113,7 @@ public sealed class SettingsService(IAppPaths appPaths, ILoggingService loggingS
     private static AppSettings Normalize(AppSettings settings)
     {
         settings.SelectedAccountIds ??= [];
+        settings.GuideSubscriptions = GuideSubscriptionCollection.Normalize(settings.GuideSubscriptions);
         settings.BackupRetentionCount = Math.Clamp(settings.BackupRetentionCount, 1, 50);
         settings.LastRoleSummary ??= string.Empty;
         settings.LastAppUpdateState ??= AppUpdateCheckState.Unknown.ToString();

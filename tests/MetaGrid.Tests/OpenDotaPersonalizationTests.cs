@@ -74,7 +74,7 @@ public sealed class OpenDotaPersonalizationTests
     {
         using var temp = new TemporaryDirectory();
         var client = new RecordingOpenDotaClient(
-            new OpenDotaPlayerProfileResponse { AccountId = "195413378", PersonaName = "Kot-Kokoc", IsProfileUnavailable = false },
+            new OpenDotaPlayerProfileResponse { AccountId = "123456789", PersonaName = "Fixture player", IsProfileUnavailable = false },
             [new OpenDotaPlayerHeroStats { HeroId = 8, Games = 10, Wins = 6, LastPlayedUnixSeconds = 1 }]);
         var service = CreateService(temp.Path, client);
         var settings = new AppSettings
@@ -86,14 +86,14 @@ public sealed class OpenDotaPersonalizationTests
         var result = await service.ResolveAsync(settings, new PersonalizationAccountContext
         {
             SourceMode = PersonalizationAccountSourceMode.SelectedSteamAccount,
-            AccountId = "195413378",
-            DisplayName = "Kot-Kokoc"
+            AccountId = "123456789",
+            DisplayName = "Fixture player"
         }, forceRefresh: true, CancellationToken.None);
 
         Assert.Equal(2, client.RequestedAccountIds.Count);
-        Assert.All(client.RequestedAccountIds, accountId => Assert.Equal("195413378", accountId));
+        Assert.All(client.RequestedAccountIds, accountId => Assert.Equal("123456789", accountId));
         Assert.Equal(PersonalizationStatus.Ready, result.Status);
-        Assert.Equal("195413378", result.AccountId);
+        Assert.Equal("123456789", result.AccountId);
         Assert.Equal(PersonalizationAccountSourceMode.SelectedSteamAccount, result.SourceMode);
     }
 
@@ -223,7 +223,7 @@ public sealed class OpenDotaPersonalizationTests
         var cacheService = new PersonalHeroCacheService(paths);
         await cacheService.SaveAsync(new PersonalizationCacheEntry
         {
-            AccountId = "195413378",
+            AccountId = "123456789",
             DisplayName = "Account A",
             FetchedAt = DateTimeOffset.Parse("2026-08-29T10:00:00Z"),
             RuleVersion = PersonalHeroSelection.CurrentRuleVersion,
@@ -323,16 +323,16 @@ public sealed class OpenDotaPersonalizationTests
         var dotaGridService = new DotaGridService();
         var baseSnapshot = LoadOfficialSnapshot();
         var provider = new StubProvider(baseSnapshot);
-        var account = CreateMissingGridAccountFixture(paths, "195413378");
+        var account = CreateMissingGridAccountFixture(paths, "123456789");
         var accountAResolution = new PersonalizationResolution
         {
             Status = PersonalizationStatus.Ready,
             SourceMode = PersonalizationAccountSourceMode.SelectedSteamAccount,
             Message = "Personal heroes ready.",
-            AccountId = "195413378",
+            AccountId = "123456789",
             Selection = new PersonalHeroSelection
             {
-                AccountId = "195413378",
+                AccountId = "123456789",
                 FetchedAt = DateTimeOffset.Parse("2026-08-29T12:00:00Z"),
                 SelectedHeroes =
                 [
@@ -386,7 +386,7 @@ public sealed class OpenDotaPersonalizationTests
         var dotaGridService = new DotaGridService();
         var baseSnapshot = LoadOfficialSnapshot();
         var provider = new StubProvider(baseSnapshot);
-        var account = CreateMissingGridAccountFixture(paths, "195413378");
+        var account = CreateMissingGridAccountFixture(paths, "123456789");
         var updateService = new UpdateService(provider, dotaGridService, backupService, historyService, logging, new FakeHeroCatalogService(500), new RoutedPersonalizationService(), new PersonalizedGridComposer(dotaGridService));
 
         var result = await updateService.CheckForUpdatesAsync([account], new AppSettings

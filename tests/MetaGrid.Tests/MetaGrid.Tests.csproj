@@ -27,5 +27,13 @@
     <Content Include="Fixtures\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\..\src\MetaGrid.UI\MainWindow.xaml" Link="Fixtures\HeroPicker.xaml" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\src\MetaGrid.UI\Styles\MetaGridTheme.xaml" Link="Fixtures\PickerTheme.xaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\MetaGrid.UI\Services\GuidesLayoutMetrics.cs" Link="Presentation\GuidesLayoutMetrics.cs" />
+    <Compile Include="..\..\src\MetaGrid.UI\ViewModels\GuideViewModels.cs" Link="Presentation\GuideViewModels.cs" />
+    <Compile Include="..\..\src\MetaGrid.UI\ViewModels\ObservableObject.cs" Link="Presentation\ObservableObject.cs" />
+    <Compile Include="..\..\src\MetaGrid.UI\ViewModels\RelayCommand.cs" Link="Presentation\RelayCommand.cs" />
   </ItemGroup>
 </Project>

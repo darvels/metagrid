@@ -2,6 +2,11 @@
 
 Dota 2 Hero Grid Updater
 
+Version 0.2.0 adds Auto Guides powered by live Dota2ProTracker builds. Choose a hero
+and enable available roles in Guides. Starting purchases, item groups, skills and
+highest-Pick-Rate talents are synchronized; disabling a role removes its owned guide.
+Not every hero/role always has a build. Keep Steam running on your selected account.
+
 MetaGrid retrieves the official Dota2ProTracker High Winrate hero grid, checks for updates, and safely installs or updates the grid for the selected Steam account.
 
 What it does:
@@ -13,7 +18,7 @@ What it does:
 - Preserves unrelated custom hero grids where supported
 - Creates backups before changes
 - Starting with MetaGrid v0.1.1, future compatible MetaGrid application releases can be installed from inside the app
-- Users on MetaGrid v0.1.0 must manually download and install v0.1.1 once because v0.1.0 did not include the built-in app updater
+- Users on MetaGrid v0.1.0 must manually download the latest version once; v0.1.1 can update in-app
 
 Basic usage:
 1. Run MetaGrid.

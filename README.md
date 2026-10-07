@@ -1,4 +1,4 @@
-# MetaGrid — Auto-Updating Dota 2 Hero Grid
+# MetaGrid — Dota 2 Hero Grid and Auto Guides
 
 [![Latest Release](https://img.shields.io/github/v/release/darvels/metagrid?label=Latest%20Release)](https://github.com/darvels/metagrid/releases/latest)
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-blue.svg)](LICENSE)
@@ -37,6 +37,10 @@ Configure automatic updates, update intervals, backup retention, Windows startup
 ## Features
 
 - Official Dota2ProTracker High Winrate grid retrieval
+- Auto Guides powered by live Dota2ProTracker builds for available hero/role combinations
+- Carry, Mid, Offlane, Support and Hard Support subscriptions
+- Accurate opening purchase quantities, item groups, skill builds and highest-Pick-Rate talents
+- Automatic guide synchronization and removal of the MetaGrid-owned guide when its role is disabled
 - Resilient provider pipeline with bounded source diagnostics
 - Startup update checks
 - Scheduled automatic updates
@@ -80,8 +84,9 @@ The distributed Windows release is self-contained with respect to .NET, so a sep
 3. Open the extracted `MetaGrid` folder.
 4. Run `MetaGrid.exe`.
 
-If you are currently on MetaGrid v0.1.0, manually install v0.1.1 once from the release ZIP.
-Starting with v0.1.1, future compatible MetaGrid application updates can be installed from inside the app.
+Users on v0.1.1 can install v0.2.0 using the built-in application updater.
+Users on v0.1.0 should manually download the latest ZIP once.
+Settings, selected accounts, subscriptions, history and backups live outside the application folder.
 
 ## Usage
 
@@ -90,6 +95,16 @@ Starting with v0.1.1, future compatible MetaGrid application updates can be inst
 3. Click `Check for Updates`, or enable `Automatic Updates`.
 4. Review the current source and grid status.
 5. Install or update the managed hero grid when MetaGrid indicates that a real change is available.
+
+## Auto Guides
+
+Open Guides, choose a hero, and enable the roles you want. With Steam running and the
+correct account selected, MetaGrid synchronizes its own guides automatically. Disabling
+a role removes only its MetaGrid-owned guide. Other guides are not removed.
+
+D2PT availability changes over time; not every hero/role has a build. Starting Items
+preserve purchase quantities (one Tango bundle contains three uses); talents use the
+highest D2PT Pick Rate. Guides require a live validated D2PT build and compatible Dota data.
 
 ## Safety and Backups
 

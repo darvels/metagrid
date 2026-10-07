@@ -37,6 +37,12 @@ public partial class App : System.Windows.Application
             services.AddSingleton<ISteamAccountService, SteamAccountService>();
             services.AddSingleton<IHeroCatalogService, HeroCatalogService>();
             services.AddSingleton<ID2ptOfficialGridRetrievalService, D2ptOfficialGridRetrievalService>();
+            services.AddSingleton<ID2ptGuidePageCapture, D2ptGuidePageCaptureService>();
+            services.AddSingleton<ID2ptGuideProvider, D2ptGuideProvider>();
+            services.AddSingleton<IDotaGuideMappingResolver, DotaGuideMappingResolver>();
+            services.AddSingleton<IValveGuideSerializer, ValveGuideSerializer>();
+            services.AddSingleton<ISteamRemoteStorageGuideService, SteamRemoteStorageGuideService>();
+            services.AddSingleton<IGuideSubscriptionService, GuideSubscriptionService>();
             services.AddSingleton<GridSnapshotCacheService>();
             services.AddSingleton<IPlayerProfileInputParser, PlayerProfileInputParser>();
             services.AddSingleton<IOpenDotaClient>(_ =>
@@ -212,8 +218,8 @@ public partial class App : System.Windows.Application
         window.WindowState = WindowState.Normal;
         window.ShowInTaskbar = true;
         window.Visibility = Visibility.Visible;
-        window.Width = 1100;
-        window.Height = 720;
+        window.Width = Math.Min(1240, SystemParameters.WorkArea.Width);
+        window.Height = Math.Min(800, SystemParameters.WorkArea.Height);
         window.MinWidth = 960;
         window.MinHeight = 640;
         window.Opacity = 1;

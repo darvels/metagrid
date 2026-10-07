@@ -15,12 +15,13 @@ return await MetaGridSelfUpdateE2E.RunAsync(args);
 
 internal static class MetaGridSelfUpdateE2E
 {
-    private const string OldVersion = "0.1.0";
-    private const string NewVersion = "0.1.1";
-    private const string PackageName = "MetaGrid-v0.1.1-win-x64";
+    private const string OldVersion = "0.1.1";
+    private const string NewVersion = "0.2.0";
+    private const string PackageName = "MetaGrid-v0.2.0-win-x64";
 
     public static async Task<int> RunAsync(string[] args)
     {
+        if (args.Contains("--verify-release")) return await VerifyLiveReleaseAsync();
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(12));
         var cancellationToken = cts.Token;
         var repoRoot = ResolveRepoRoot();
@@ -38,8 +39,12 @@ internal static class MetaGridSelfUpdateE2E
             var newBuildRoot = Path.Combine(buildRoot, PackageName);
             Directory.CreateDirectory(buildRoot);
 
-            await PublishAppPairAsync(repoRoot, oldBuildRoot, OldVersion, "0.1.0-e2e-old", cancellationToken);
-            await PublishAppPairAsync(repoRoot, newBuildRoot, NewVersion, "0.1.1-e2e-new", cancellationToken);
+            var oldPackage = args.FirstOrDefault(a => a.StartsWith("--old-package=", StringComparison.Ordinal));
+            var newPackage = args.FirstOrDefault(a => a.StartsWith("--new-package=", StringComparison.Ordinal));
+            if (oldPackage is null) await PublishAppPairAsync(repoRoot, oldBuildRoot, OldVersion, "0.1.1-e2e-old", cancellationToken);
+            else ExtractInputPackage(oldPackage[14..], oldBuildRoot);
+            if (newPackage is null) await PublishAppPairAsync(repoRoot, newBuildRoot, NewVersion, "0.2.0-e2e-new", cancellationToken);
+            else ExtractInputPackage(newPackage[14..], newBuildRoot);
 
             await File.WriteAllTextAsync(Path.Combine(oldBuildRoot, "old-version-sentinel.txt"), "OLD_BUILD_SENTINEL", cancellationToken);
             await File.WriteAllTextAsync(Path.Combine(newBuildRoot, "new-version-sentinel.txt"), "NEW_BUILD_SENTINEL", cancellationToken);
@@ -81,6 +86,15 @@ internal static class MetaGridSelfUpdateE2E
             result.Rollback = await RunRollbackScenarioAsync(tempRoot, oldBuildRoot, newBuildRoot, cancellationToken);
             result.Security = await RunSecurityChecksAsync(tempRoot, newBuildRoot, cancellationToken);
 
+            if (result.Positive.NewVersionReported.Split('+')[0] != NewVersion || !result.Positive.Responding
+                || !result.Positive.NewSentinelExists || !result.Positive.OldSentinelRemoved
+                || result.Positive.PersistentSentinelsPreserved.Values.Any(v => !v)
+                || result.NegativeSha.UpdaterLaunched || !result.NegativeSha.InstallUnchanged
+                || !result.Rollback.OldInstallationRestored || !result.Rollback.OldAppRelaunched
+                || !result.Security.TraversalRejected || result.Security.OutsideFileCreated
+                || result.Security.UnsafePathExitCodes.Values.Any(v => v == 0))
+                throw new InvalidOperationException("Self-update release gates failed; inspect scenario results.");
+
             var reportPath = Path.Combine(tempRoot, "report.json");
             await File.WriteAllTextAsync(reportPath, JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }), cancellationToken);
             Console.WriteLine($"[MetaGrid.SelfUpdateE2E] Report: {reportPath}");
@@ -93,6 +107,44 @@ internal static class MetaGridSelfUpdateE2E
             Console.Error.WriteLine(ex);
             return 1;
         }
+    }
+
+    private static async Task<int> VerifyLiveReleaseAsync()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        var root = Path.Combine(ResolveRepoRoot(), "tmp", "v0.2.0-post-publish");
+        using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
+        var paths = new HarnessAppPaths(root);
+        var service = new GitHubAppUpdateService(new GitHubReleaseClient(client),
+            new AppUpdateDownloader(client, paths), new HarnessNoLaunchUpdater(),
+            new HarnessRuntimeInfo(root, Environment.ProcessId, OldVersion), new AppClock(),
+            new HarnessLoggingService(Path.Combine(root, "Logs")));
+        var info = await service.CheckForUpdatesAsync(new AppSettings(), true, null, timeout.Token);
+        if (!info.IsUpdateAvailable || info.AvailableVersion != NewVersion
+            || info.PackageAsset?.Name != PackageName + ".zip"
+            || info.Sha256Asset?.Name != PackageName + ".zip.sha256")
+            throw new InvalidOperationException("Published release discovery/asset contract failed: " + info.Message);
+        var prepared = await new AppUpdateDownloader(client, paths).DownloadAndPrepareAsync(info, timeout.Token);
+        var version = GetFileVersion(Path.Combine(prepared.PackageRootDirectory, "MetaGrid.exe"));
+        if (version.Split('+')[0] != NewVersion) throw new InvalidOperationException("Downloaded version mismatch.");
+        await File.WriteAllTextAsync(Path.Combine(root, "verification.json"), JsonSerializer.Serialize(new
+        {
+            Current = OldVersion, Available = info.AvailableVersion, info.State,
+            Package = info.PackageAsset.Name, Sidecar = info.Sha256Asset.Name,
+            VerifiedSha256 = prepared.ExpectedSha256, Version = version,
+            UpdaterIncluded = File.Exists(Path.Combine(prepared.PackageRootDirectory, "MetaGrid.Updater.exe")),
+            Relaunch = prepared.RelaunchExecutableName, Installed = false
+        }, new JsonSerializerOptions { WriteIndented = true }), timeout.Token);
+        Console.WriteLine($"LIVE_RELEASE_VERIFIED {OldVersion} -> {NewVersion}; SHA={prepared.ExpectedSha256}; staged only, no install");
+        return 0;
+    }
+
+    private static void ExtractInputPackage(string archive, string outputRoot)
+    {
+        var extracted = outputRoot + "-input";
+        ZipFile.ExtractToDirectory(Path.GetFullPath(archive), extracted);
+        var executable = Directory.GetFiles(extracted, "MetaGrid.exe", SearchOption.AllDirectories).Single();
+        CopyDirectory(Path.GetDirectoryName(executable)!, outputRoot);
     }
 
     private static async Task PublishAppPairAsync(string repoRoot, string outputRoot, string version, string informationalVersion, CancellationToken cancellationToken)
@@ -225,6 +277,7 @@ internal static class MetaGridSelfUpdateE2E
 
     private static async Task<PositiveScenarioResult> RunPositiveScenarioAsync(ScenarioRoot scenario, AppReleaseMetadata release, LocalReleaseServer server, CancellationToken cancellationToken)
     {
+        Environment.SetEnvironmentVariable("METAGRID_APPDATA_ROOT", scenario.AppDataRoot);
         using var oldProcess = LaunchMetaGridProcess(scenario.InstallRoot, scenario.AppDataRoot);
         await WaitForWindowAsync(oldProcess, cancellationToken);
 
@@ -345,6 +398,7 @@ internal static class MetaGridSelfUpdateE2E
         CopyDirectory(pristineOldBuild, installRoot);
         CopyDirectory(pristineNewBuild, packageRoot);
         await CreateAppSettingsAsync(appDataRoot, cancellationToken);
+        Environment.SetEnvironmentVariable("METAGRID_APPDATA_ROOT", appDataRoot);
         await CreatePersistentSentinelsAsync(persistentRoot, cancellationToken);
 
         using var oldProcess = LaunchMetaGridProcess(installRoot, appDataRoot);
@@ -822,6 +876,12 @@ internal sealed class HarnessReleaseClient(AppReleaseMetadata release) : IGitHub
         => Task.FromResult<IReadOnlyList<AppReleaseMetadata>>([release]);
 }
 
+internal sealed class HarnessNoLaunchUpdater : IUpdaterLauncher
+{
+    public Task<AppUpdateLaunchResult> LaunchAsync(PreparedAppUpdatePackage package, string currentVersion, CancellationToken cancellationToken)
+        => throw new InvalidOperationException("The live verification probe must never install or relaunch.");
+}
+
 internal sealed class HarnessRuntimeInfo(string installDirectory, int processId, string currentVersion) : IAppRuntimeInfo
 {
     public string GetCurrentVersion() => currentVersion;
@@ -871,6 +931,7 @@ internal sealed class HarnessLoggingService : ILoggingService
 
 internal sealed class HarnessAppPaths : IAppPaths
 {
+    public string GuideCacheDirectory => Path.Combine(CacheDirectory, "Guides");
     public HarnessAppPaths(string rootDirectory)
     {
         RootDirectory = rootDirectory;

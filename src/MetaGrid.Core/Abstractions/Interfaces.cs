@@ -34,11 +34,54 @@ public interface ISteamAccountService
 public interface IHeroCatalogService
 {
     Task<IReadOnlyDictionary<string, HeroDefinition>> LoadByNameAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<HeroDefinition>> LoadAllAsync(CancellationToken cancellationToken);
 }
 
 public interface IHeroGridProvider
 {
     Task<HeroGridSnapshot> FetchAsync(HeroGridPreset preset, CancellationToken cancellationToken);
+}
+
+public interface ID2ptGuideProvider
+{
+    Task<NormalizedHeroGuideBuild> FetchAsync(GuideSubscriptionRecord subscription, CancellationToken cancellationToken);
+}
+
+public interface ID2ptGuidePageCapture
+{
+    Task<string> CaptureAsync(CancellationToken cancellationToken);
+    Task<string> CaptureIndexAsync(CancellationToken cancellationToken)
+        => throw new NotSupportedException("This capture implementation does not support the public build index.");
+    Task<string> CaptureStartingInventoriesAsync(string heroName, GuideRole role, CancellationToken cancellationToken)
+        => throw new NotSupportedException("Exact opening-inventory capture is required; refusing aggregated item pools.");
+}
+
+public interface IDotaGuideMappingResolver
+{
+    Task<DotaGuideMappingResult> ResolveAsync(SteamAccount account, GuideSubscriptionRecord subscription, NormalizedHeroGuideBuild build, CancellationToken cancellationToken);
+}
+
+public interface IValveGuideSerializer
+{
+    string ComputeCanonicalSourceHash(NormalizedHeroGuideBuild build);
+    string ComputeEffectiveGuideHash(ResolvedHeroGuideBuild build);
+    GuideSerializationResult Serialize(ResolvedHeroGuideBuild build, int revision, DateTimeOffset updatedAtUtc);
+    ParsedValveGuideDocument Parse(string text);
+}
+
+public interface ISteamRemoteStorageGuideService
+{
+    Task<bool> IsAvailableAsync(SteamAccount account, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RemoteGuideFileEntry>> ListFilesAsync(SteamAccount account, CancellationToken cancellationToken);
+    Task<byte[]?> ReadFileAsync(SteamAccount account, string remoteFile, CancellationToken cancellationToken);
+    Task<RemoteGuideWriteResult> WriteFileAsync(SteamAccount account, string remoteFile, byte[] bytes, CancellationToken cancellationToken);
+    Task<RemoteGuideDeleteResult> DeleteOwnedFileAsync(SteamAccount account, string remoteFile, string expectedContentHash, CancellationToken cancellationToken);
+}
+
+public interface IGuideSubscriptionService
+{
+    Task<GuideSubscriptionSyncResult> SyncAsync(SteamAccount account, GuideSubscriptionRecord subscription, CancellationToken cancellationToken);
+    Task<GuideRemovalResult> RemoveAsync(SteamAccount account, GuideSubscriptionRecord subscription, CancellationToken cancellationToken);
 }
 
 public interface IPlayerProfileInputParser
@@ -182,6 +225,7 @@ public interface IAppPaths
     string D2ptCacheDirectory { get; }
     string D2ptTempDirectory { get; }
     string D2ptWebView2ProfileDirectory { get; }
+    string GuideCacheDirectory { get; }
     string AppUpdateDirectory { get; }
     string AppUpdateSessionDirectory { get; }
 }

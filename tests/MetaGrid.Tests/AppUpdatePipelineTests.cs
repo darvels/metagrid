@@ -47,7 +47,7 @@ public sealed class AppUpdatePipelineTests
             ]),
             new FakeDownloader(),
             new FakeUpdaterLauncher(),
-            new FakeRuntimeInfo("0.1.0"),
+            new FakeRuntimeInfo("0.1.1"),
             new FakeClock(DateTimeOffset.Parse("2026-08-29T12:00:00Z")),
             new FakeLoggingService());
 

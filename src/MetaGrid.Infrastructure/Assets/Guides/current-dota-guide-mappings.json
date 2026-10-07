@@ -1,0 +1,39 @@
+{
+  "heroes": {
+    "npc_dota_hero_wisp": {
+      "guideHeroToken": "wisp",
+      "supportedRoles": {
+        "Mid": {
+          "guideRoleToken": "#DOTA_HeroGuide_Role_Core"
+        }
+      },
+      "abilities": [
+        "wisp_spirits",
+        "wisp_tether",
+        "wisp_overcharge",
+        "wisp_relocate"
+      ],
+      "talents": [
+        "special_bonus_unique_wisp",
+        "special_bonus_strength_8",
+        "special_bonus_unique_wisp_10",
+        "special_bonus_unique_wisp_relocate_delay"
+      ],
+      "items": [
+        "item_branches",
+        "item_bottle",
+        "item_magic_wand",
+        "item_null_talisman",
+        "item_ultimate_scepter",
+        "item_black_king_bar",
+        "item_shivas_guard",
+        "item_octarine_core",
+        "item_heart",
+        "item_sheepstick",
+        "item_cyclone",
+        "item_aeon_disk",
+        "item_lesser_crit"
+      ]
+    }
+  }
+}

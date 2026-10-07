@@ -6,6 +6,13 @@ namespace MetaGrid.Infrastructure.Services;
 
 public static class D2ptPageDataExtractor
 {
+    public static string ExtractHydrationJson(string html)
+    {
+        if (LooksLikeCloudflareChallenge(html)) throw new InvalidOperationException("D2PT blocked by Cloudflare.");
+        var script = ExtractHydrationScript(html) ?? throw new InvalidOperationException("SvelteKit hydration script missing.");
+        var data = ExtractBracketedArray(script, "data:") ?? throw new InvalidOperationException("SvelteKit page data missing.");
+        return NormalizeJavaScriptLiteralToJson(data);
+    }
     public static D2ptPageDataExtractionResult ExtractMatchesWr(string html)
     {
         if (string.IsNullOrWhiteSpace(html))
@@ -273,6 +280,16 @@ public static class D2ptPageDataExtractor
                         }
 
                         var token = jsLiteral[index..endIndex];
+                        if (token == "new")
+                        {
+                            var date = System.Text.RegularExpressions.Regex.Match(jsLiteral[index..], @"^new\s+Date\((\d{1,16})\)",
+                                System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+                            if (!date.Success) throw new InvalidDataException("Unsupported executable hydration expression.");
+                            builder.Append(date.Groups[1].Value);
+                            index += date.Length - 1;
+                            lastSignificant = '0';
+                            continue;
+                        }
                         var colonIndex = endIndex;
                         while (colonIndex < jsLiteral.Length && char.IsWhiteSpace(jsLiteral[colonIndex]))
                         {

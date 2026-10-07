@@ -20,7 +20,10 @@ coverage.*
 .dotnet-home/
 .nuget/
 tmp/
-tools/
+tools/*
+!tools/MetaGrid.GuideLiveProbe/
+!tools/MetaGrid.GuideLiveProbe/MetaGrid.GuideLiveProbe.csproj
+!tools/MetaGrid.GuideLiveProbe/Program.cs
 !tools/MetaGrid.SelfUpdateE2E/
 !tools/MetaGrid.SelfUpdateE2E/MetaGrid.SelfUpdateE2E.csproj
 !tools/MetaGrid.SelfUpdateE2E/Program.cs
@@ -36,3 +39,6 @@ logs/
 /continue-*.png
 /check-updates-*.png
 /run-*.log
+
+# Local investigation reports may contain Steam identifiers and machine paths.
+/docs/*_REPORT.md

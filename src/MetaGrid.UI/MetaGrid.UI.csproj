@@ -12,10 +12,6 @@
     <Description>Dota 2 Hero Grid Updater</Description>
     <Company>Darvel &amp; Codex</Company>
     <Authors>Darvel &amp; Codex</Authors>
-    <Version>0.1.1</Version>
-    <FileVersion>0.1.1.0</FileVersion>
-    <AssemblyVersion>0.1.1.0</AssemblyVersion>
-    <InformationalVersion>0.1.1</InformationalVersion>
     <ApplicationIcon>Assets\metagrid.ico</ApplicationIcon>
   </PropertyGroup>
 

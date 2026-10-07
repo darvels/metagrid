@@ -1,4 +1,4 @@
-$Version = '0.1.1'
+$Version = '0.2.0'
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
@@ -8,6 +8,12 @@ $publishDir = Join-Path $releaseRoot "MetaGrid"
 $updaterPublishDir = Join-Path $releaseRoot "MetaGrid.Updater"
 $zipPath = Join-Path $releaseRoot "MetaGrid-v$Version-win-x64.zip"
 $shaPath = "$zipPath.sha256"
+
+foreach ($target in @($publishDir, $updaterPublishDir, (Join-Path $releaseRoot '_ziproot'))) {
+    if (-not [IO.Path]::GetFullPath($target).StartsWith([IO.Path]::GetFullPath($releaseRoot) + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Unsafe release path: $target"
+    }
+}
 
 if (Test-Path $publishDir) {
     Remove-Item -LiteralPath $publishDir -Recurse -Force
@@ -26,6 +32,7 @@ dotnet publish (Join-Path $projectRoot "src\MetaGrid.UI\MetaGrid.UI.csproj") `
     --self-contained true `
     -o $publishDir `
     /p:PublishSingleFile=true
+if ($LASTEXITCODE -ne 0) { throw 'UI publish failed.' }
 
 dotnet publish (Join-Path $projectRoot "src\MetaGrid.Updater\MetaGrid.Updater.csproj") `
     -c Release `
@@ -33,6 +40,7 @@ dotnet publish (Join-Path $projectRoot "src\MetaGrid.Updater\MetaGrid.Updater.cs
     --self-contained true `
     -o $updaterPublishDir `
     /p:PublishSingleFile=true
+if ($LASTEXITCODE -ne 0) { throw 'Updater publish failed.' }
 
 Get-ChildItem -LiteralPath $publishDir -Recurse -File |
     Where-Object { $_.Extension -in @('.pdb', '.xml') } |

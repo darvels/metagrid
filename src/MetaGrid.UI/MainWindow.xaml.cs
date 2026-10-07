@@ -11,6 +11,76 @@ namespace MetaGrid.UI;
 
 public partial class MainWindow : Window
 {
+    private void GuidePickerOutsideMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        // Do not capture the mouse: TextBox editing and the arrow keep their normal routing.
+        if (!GuidePickerHost.IsMouseOver && GuideHeroPopup.Child?.IsMouseOver != true && DataContext is MainViewModel vm)
+            vm.IsGuidePickerOpen = false;
+    }
+
+    private void GuidePickerWindowDeactivated(object sender, EventArgs e)
+    {
+        if (DataContext is MainViewModel vm) vm.IsGuidePickerOpen = false;
+    }
+
+    private void GuidePickerPanelSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (GuidePickerHost is null || sender is not System.Windows.Controls.Border panel) return;
+        GuidePickerHost.Width = Math.Clamp(e.NewSize.Width - panel.Padding.Left - panel.Padding.Right, 200, 240);
+    }
+
+    private void GuidePickerKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        if (e.Key == System.Windows.Input.Key.Escape || e.Key == System.Windows.Input.Key.Enter)
+        {
+            if (e.Key == System.Windows.Input.Key.Enter) vm.SelectPickerHero();
+            GuideHeroSearch.Focus();
+            vm.IsGuidePickerOpen = false;
+            e.Handled = true;
+        }
+        else if (!GuideHeroResults.IsKeyboardFocusWithin && (e.Key == System.Windows.Input.Key.Down || e.Key == System.Windows.Input.Key.Up))
+        {
+            vm.IsGuidePickerOpen = true;
+            var delta = e.Key == System.Windows.Input.Key.Down ? 1 : -1;
+            GuideHeroResults.SelectedIndex = Math.Clamp(GuideHeroResults.SelectedIndex + delta, 0, Math.Max(0, GuideHeroResults.Items.Count - 1));
+            if (GuideHeroResults.SelectedItem is not null) GuideHeroResults.ScrollIntoView(GuideHeroResults.SelectedItem);
+            e.Handled = true;
+        }
+    }
+
+    private void GuidePickerMouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (DataContext is MainViewModel vm && e.OriginalSource is DependencyObject source &&
+            System.Windows.Controls.ItemsControl.ContainerFromElement(GuideHeroResults, source) is System.Windows.Controls.ListBoxItem)
+            vm.SelectPickerHero();
+    }
+
+    private void HeroImageFailed(object sender, ExceptionRoutedEventArgs e)
+    {
+        // Preserve the name tooltip and ID placeholder if the CDN image cannot be loaded.
+        if (sender is System.Windows.Controls.Image image)
+            image.Visibility = Visibility.Collapsed;
+    }
+
+    private void GuidesContentSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (GuideCatalogPanel is null || GuideDetailsPanel is null) return;
+        var split = GuidesLayoutMetrics.IsSplit(e.NewSize.Width);
+        var editorWidth = GuidesLayoutMetrics.EditorWidth(e.NewSize.Width);
+        GuidesContentGrid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
+        GuidesContentGrid.ColumnDefinitions[1].Width = new GridLength(split ? GuidesLayoutMetrics.Gutter : 0);
+        GuidesContentGrid.ColumnDefinitions[2].Width = new GridLength(split ? editorWidth : 0);
+        System.Windows.Controls.Grid.SetRow(GuideCatalogPanel, split ? 0 : 2);
+        System.Windows.Controls.Grid.SetColumn(GuideDetailsPanel, split ? 2 : 0);
+        if (DataContext is MainViewModel viewModel)
+        {
+            var catalogWidth = Math.Max(140, (split ? e.NewSize.Width - editorWidth - GuidesLayoutMetrics.Gutter : e.NewSize.Width) - 34);
+            var columns = Math.Max(1, (int)(catalogWidth / 225));
+            viewModel.GuideCatalogItemWidth = catalogWidth / columns;
+        }
+    }
+
     private readonly NotifyIcon? _notifyIcon;
     private readonly Stream? _trayIconStream;
     private readonly System.Drawing.Icon? _trayIcon;
@@ -260,6 +330,7 @@ public partial class MainWindow : Window
 
     private void DashboardClick(object sender, RoutedEventArgs e) => _viewModel.SelectedPage = AppPage.Dashboard;
     private void HeroGridClick(object sender, RoutedEventArgs e) => _viewModel.SelectedPage = AppPage.HeroGrid;
+    private void GuidesClick(object sender, RoutedEventArgs e) => _viewModel.SelectedPage = AppPage.Guides;
     private void AccountsClick(object sender, RoutedEventArgs e) => _viewModel.SelectedPage = AppPage.Accounts;
     private void HistoryClick(object sender, RoutedEventArgs e) => _viewModel.SelectedPage = AppPage.UpdateHistory;
     private void SettingsClick(object sender, RoutedEventArgs e) => _viewModel.SelectedPage = AppPage.Settings;

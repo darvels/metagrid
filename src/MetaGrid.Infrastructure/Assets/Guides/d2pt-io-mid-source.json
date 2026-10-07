@@ -1,0 +1,78 @@
+{
+  "heroId": 91,
+  "heroInternalName": "npc_dota_hero_wisp",
+  "role": "Mid",
+  "source": "Dota2ProTracker",
+  "sourceBuildId": "io-pos2-1",
+  "sourceTitle": "Aghanim's Scepter Core",
+  "gameplayVersion": "7.41e",
+  "winRate": 64.0,
+  "matches": 11,
+  "sourceUrl": "https://dota2protracker.com/builds/io-pos2-1",
+  "retrievedAtUtc": "2026-09-03T00:00:00Z",
+  "itemGroups": [
+    {
+      "categoryKey": "#DOTA_Item_Build_Starting_Items",
+      "displayName": "Starting items",
+      "itemIds": [ "item_branches", "item_branches", "item_branches", "item_branches", "item_branches" ]
+    },
+    {
+      "categoryKey": "#DOTA_Item_Build_Early_Game",
+      "displayName": "Early game",
+      "itemIds": [ "item_bottle", "item_magic_wand", "item_null_talisman" ]
+    },
+    {
+      "categoryKey": "#DOTA_Item_Build_Core_Items",
+      "displayName": "Core items",
+      "itemIds": [ "item_ultimate_scepter", "item_black_king_bar", "item_shivas_guard" ]
+    },
+    {
+      "categoryKey": "EXTENSION ITEMS",
+      "displayName": "Extension items",
+      "itemIds": [ "item_octarine_core", "item_heart", "item_sheepstick" ]
+    },
+    {
+      "categoryKey": "SITUATIONAL ITEMS",
+      "displayName": "Situational items",
+      "itemIds": [ "item_cyclone", "item_aeon_disk", "item_lesser_crit" ]
+    }
+  ],
+  "skillOrder": [
+    "wisp_spirits",
+    "wisp_tether",
+    "wisp_spirits",
+    "wisp_overcharge",
+    "wisp_spirits",
+    "wisp_relocate",
+    "wisp_spirits",
+    "wisp_overcharge",
+    "wisp_overcharge",
+    "wisp_overcharge"
+  ],
+  "talentChoices": [
+    {
+      "level": 10,
+      "talentId": "special_bonus_unique_wisp",
+      "selectedLabel": "+1.5s Overcharge Duration",
+      "alternativeLabel": "+5% Tether Movement Speed"
+    },
+    {
+      "level": 15,
+      "talentId": "special_bonus_strength_8",
+      "selectedLabel": "+8 Strength",
+      "alternativeLabel": "+5% Tether Movement Speed"
+    },
+    {
+      "level": 20,
+      "talentId": "special_bonus_unique_wisp_10",
+      "selectedLabel": "+50% Spirits Damage",
+      "alternativeLabel": "+0.2% Overcharge Max HP Regen Bonus"
+    },
+    {
+      "level": 25,
+      "talentId": "special_bonus_unique_wisp_relocate_delay",
+      "selectedLabel": "-2s Relocate Cast Delay",
+      "alternativeLabel": "Attack Tethered Ally's Target (50% damage)"
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+"guidedata"
+{
+    "Hero"        "wisp"
+    "Title"       "MetaGrid D2PT Io Mid - Aghanim's Scepter Core"
+    "Role"        "#DOTA_HeroGuide_Role_Core"
+    "GameplayVersion"        "7.41e"
+    "Overview"        "Dota2ProTracker Io Mid pro build. Generated for MetaGrid testing."
+    "GuideRevision"        "1"
+    "AssociatedWorkshopItemID"        "0x0000000000000000"
+    "OriginalCreatorID"        "0x000000000000007B"
+    "GuideFormatVersion"        "2"
+    "TimeUpdated"        "0x000000006A99CF0A"
+    "TimePublished"        "0x0000000000000000"
+
+    "ItemBuild"
+    {
+        "Items"
+        {
+            "#DOTA_Item_Build_Starting_Items"
+            {
+                "item"        "item_branches"
+                "item"        "item_branches"
+                "item"        "item_branches"
+                "item"        "item_branches"
+                "item"        "item_branches"
+            }
+
+            "#DOTA_Item_Build_Early_Game"
+            {
+                "item"        "item_bottle"
+                "item"        "item_magic_wand"
+                "item"        "item_null_talisman"
+            }
+
+            "#DOTA_Item_Build_Core_Items"
+            {
+                "item"        "item_ultimate_scepter"
+                "item"        "item_black_king_bar"
+                "item"        "item_shivas_guard"
+            }
+
+            "EXTENSION ITEMS"
+            {
+                "item"        "item_octarine_core"
+                "item"        "item_heart"
+                "item"        "item_sheepstick"
+            }
+
+            "SITUATIONAL ITEMS"
+            {
+                "item"        "item_cyclone"
+                "item"        "item_aeon_disk"
+                "item"        "item_lesser_crit"
+            }
+        }
+
+        "ItemTooltips"
+        {
+        }
+    }
+
+    "AbilityBuild"
+    {
+        "AbilityOrder"
+        {
+            "1"        "wisp_spirits"
+            "2"        "wisp_tether"
+            "3"        "wisp_spirits"
+            "4"        "wisp_overcharge"
+            "5"        "wisp_spirits"
+            "6"        "wisp_relocate"
+            "7"        "wisp_spirits"
+            "8"        "wisp_overcharge"
+            "9"        "wisp_overcharge"
+            "10"       "wisp_overcharge"
+            "27"       "special_bonus_unique_wisp"
+            "28"       "special_bonus_strength_8"
+            "29"       "special_bonus_unique_wisp_10"
+            "30"       "special_bonus_unique_wisp_relocate_delay"
+        }
+
+        "AbilityTooltips"
+        {
+        }
+    }
+}

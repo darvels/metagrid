@@ -8,15 +8,15 @@
         Icon="Assets/metagrid.ico"
         Width="1240"
         Height="800"
-        MinWidth="1080"
-        MinHeight="700"
+        MinWidth="960"
+        MinHeight="640"
         WindowStartupLocation="CenterScreen"
         WindowState="Normal"
         ShowInTaskbar="True"
         Visibility="Visible"
         Opacity="1"
         Background="{StaticResource WindowBrush}"
-        WindowStyle="SingleBorderWindow">
+        WindowStyle="SingleBorderWindow" PreviewMouseDown="GuidePickerOutsideMouseDown" Deactivated="GuidePickerWindowDeactivated">
   <Grid Margin="20">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="264" />
@@ -50,6 +50,7 @@
                     Margin="0,10,0,0">
           <Button Style="{StaticResource SidebarButtonStyle}" Click="DashboardClick" Content="{Binding Text.Dashboard}" />
           <Button Style="{StaticResource SidebarButtonStyle}" Click="HeroGridClick" Content="{Binding Text.HeroGrid}" />
+          <Button Style="{StaticResource SidebarButtonStyle}" Click="GuidesClick" Content="{Binding Text.Guides}" />
           <Button Style="{StaticResource SidebarButtonStyle}" Click="AccountsClick" Content="{Binding Text.Accounts}" />
           <Button Style="{StaticResource SidebarButtonStyle}" Click="HistoryClick" Content="{Binding Text.UpdateHistory}" />
           <Button Style="{StaticResource SidebarButtonStyle}" Click="SettingsClick" Content="{Binding Text.Settings}" />
@@ -88,7 +89,7 @@
       </Grid>
     </Border>
 
-    <Grid Grid.Column="2">
+    <Grid Grid.Column="2" x:Name="MainContentHost" MaxWidth="1900" HorizontalAlignment="Stretch">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="18" />
@@ -324,6 +325,172 @@
               <Style TargetType="Border" BasedOn="{StaticResource PanelBorderStyle}">
                 <Setter Property="Visibility" Value="Collapsed" />
                 <Style.Triggers>
+                  <DataTrigger Binding="{Binding SelectedPage}" Value="Guides">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Border.Style>
+            <Grid>
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="18" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <StackPanel>
+                <TextBlock Text="{Binding Text.Guides}" Style="{StaticResource PageTitleTextStyle}" FontSize="28" />
+                <TextBlock Text="{Binding Text.GuidesDescription}" Margin="0,8,0,0"
+                           Style="{StaticResource HelperTextStyle}" TextWrapping="Wrap" />
+              </StackPanel>
+              <Grid x:Name="GuidesContentGrid" Grid.Row="2" SizeChanged="GuidesContentSizeChanged">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="0" />
+                  <ColumnDefinition Width="0" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                  <RowDefinition Height="Auto" />
+                  <RowDefinition Height="18" />
+                  <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Border x:Name="GuideCatalogPanel" Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="16" VerticalAlignment="Top">
+                  <StackPanel>
+                    <TextBlock Text="{Binding Text.MyAutoGuides}" Style="{StaticResource SectionTitleTextStyle}" Margin="0,0,0,12" />
+                    <TextBlock Text="{Binding Text.NoAutoGuides}" TextWrapping="Wrap">
+                      <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource HelperTextStyle}"><Setter Property="Visibility" Value="Visible" /><Style.Triggers><DataTrigger Binding="{Binding HasMyGuides}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                    </TextBlock>
+                    <ItemsControl ItemsSource="{Binding MyGuideHeroes}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <WrapPanel ItemWidth="{Binding DataContext.GuideCatalogItemWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Button Command="{Binding SelectCommand}" Style="{StaticResource ContentCardButtonStyle}"
+                                  Margin="0,0,6,6" Padding="0" Background="Transparent" BorderThickness="0"
+                                  AutomationProperties.Name="{Binding Hero.LocalizedName}">
+                            <Border CornerRadius="12" Background="#252525" BorderBrush="#363636" BorderThickness="1" Padding="10">
+                              <Grid>
+                                <Grid.ColumnDefinitions>
+                                  <ColumnDefinition Width="40" />
+                                  <ColumnDefinition Width="10" />
+                                  <ColumnDefinition Width="*" />
+                                  <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="40" Height="40" Background="#303030" CornerRadius="8">
+                                  <Grid>
+                                    <TextBlock Text="{Binding Hero.Id}" Foreground="#A0A0A0" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="10" />
+                                    <Image Source="{Binding IconUrl}" Stretch="Uniform" ImageFailed="HeroImageFailed" />
+                                  </Grid>
+                                </Border>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                  <TextBlock Text="{Binding Hero.LocalizedName}" TextWrapping="Wrap" Foreground="{StaticResource PrimaryBrush}" FontSize="15" />
+                                  <ItemsControl ItemsSource="{Binding Roles}" Margin="0,6,0,0">
+                                    <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate><DataTemplate>
+                                      <Border CornerRadius="6" Background="#303030" Padding="6,3" Margin="0,0,4,4" ToolTip="{Binding StatusTooltip}">
+                                        <StackPanel Orientation="Horizontal"><Ellipse Style="{StaticResource GuideRoleIndicatorStyle}" /><TextBlock Text="{Binding Label}" FontSize="11" /></StackPanel>
+                                      </Border>
+                                    </DataTemplate></ItemsControl.ItemTemplate>
+                                  </ItemsControl>
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                                  <TextBlock Text="✓" Foreground="#CDAA62"
+                                             Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                </StackPanel>
+                              </Grid>
+                            </Border>
+                          </Button>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Border>
+                <Border x:Name="GuideDetailsPanel" Style="{StaticResource CardBorderStyle}" Padding="12,16" VerticalAlignment="Top" SizeChanged="GuidePickerPanelSizeChanged">
+                  <StackPanel>
+                    <TextBlock Text="{Binding Text.AddGuideHero}" Style="{StaticResource SectionTitleTextStyle}" />
+                    <Grid x:Name="GuidePickerHost" Margin="0,10,0,18" MinWidth="200" MaxWidth="240" HorizontalAlignment="Left" Width="240" PreviewKeyDown="GuidePickerKeyDown">
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="24" /></Grid.ColumnDefinitions>
+                      <TextBox x:Name="GuideHeroSearch" Text="{Binding GuidesSearchText, UpdateSourceTrigger=PropertyChanged}"
+                               Style="{StaticResource GuideSearchTextBoxStyle}" Tag="{Binding Text.SearchGuideHero}"
+                               ToolTip="{Binding Text.SearchGuideHero}" AutomationProperties.Name="{Binding Text.SearchGuideHero}" />
+                      <ToggleButton Grid.Column="1" Content="⌄" ToolTip="{Binding Text.AddGuideHero}" AutomationProperties.Name="{Binding Text.AddGuideHero}" Style="{StaticResource GuidePickerToggleStyle}" IsChecked="{Binding IsGuidePickerOpen, Mode=TwoWay}" />
+                      <Popup x:Name="GuideHeroPopup" PlacementTarget="{Binding ElementName=GuidePickerHost}" Placement="Bottom" StaysOpen="True"
+                             AllowsTransparency="True" IsOpen="{Binding IsGuidePickerOpen, Mode=TwoWay}">
+                        <Border Width="{Binding ActualWidth, ElementName=GuidePickerHost}" MaxHeight="330" Padding="6"
+                                Background="#232323" BorderBrush="#444444" BorderThickness="1" CornerRadius="10">
+                          <StackPanel>
+                            <TextBlock Text="{Binding Text.NoGuideHeroMatches}" Margin="8" TextWrapping="Wrap" Foreground="{StaticResource PrimaryBrush}">
+                              <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Visible" /><Style.Triggers><DataTrigger Binding="{Binding HasPickerResults}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                            </TextBlock>
+                            <ListBox x:Name="GuideHeroResults" ItemsSource="{Binding GuideHeroes}" SelectedItem="{Binding GuidePickerHighlightedHero, Mode=TwoWay}"
+                                     MaxHeight="310" Background="Transparent" BorderThickness="0" Foreground="{StaticResource PrimaryBrush}"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                                     PreviewKeyDown="GuidePickerKeyDown" PreviewMouseLeftButtonUp="GuidePickerMouseUp">
+                              <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="8,6" />
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}" />
+                                <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+                                  <Border x:Name="ItemSurface" CornerRadius="6" Background="Transparent" Padding="{TemplateBinding Padding}"><ContentPresenter /></Border>
+                                  <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ItemSurface" Property="Background" Value="#343434" /></Trigger>
+                                    <Trigger Property="IsSelected" Value="True"><Setter TargetName="ItemSurface" Property="Background" Value="#424039" /></Trigger>
+                                  </ControlTemplate.Triggers>
+                                </ControlTemplate></Setter.Value></Setter>
+                              </Style></ListBox.ItemContainerStyle>
+                              <ListBox.ItemTemplate><DataTemplate><StackPanel Orientation="Horizontal">
+                                <Image Source="{Binding IconUrl}" Width="32" Height="32" Margin="0,0,10,0" ImageFailed="HeroImageFailed" />
+                                <TextBlock Text="{Binding Hero.LocalizedName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                              </StackPanel></DataTemplate></ListBox.ItemTemplate>
+                            </ListBox>
+                          </StackPanel>
+                        </Border>
+                      </Popup>
+                    </Grid>
+                    <StackPanel Visibility="{Binding HasGuideSelection, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="64" />
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="*" />
+                      </Grid.ColumnDefinitions>
+                      <Border Width="64" Height="64" Background="#262626" CornerRadius="14">
+                        <Image Source="{Binding SelectedGuidePortraitUrl}" Stretch="Uniform" ImageFailed="HeroImageFailed" />
+                      </Border>
+                      <TextBlock Grid.Column="2" Text="{Binding SelectedGuideName}" VerticalAlignment="Center"
+                                 Style="{StaticResource PageTitleTextStyle}" FontSize="26" TextWrapping="Wrap" />
+                    </Grid>
+                    <TextBlock Text="{Binding Text.GuideRoles}" Margin="0,18,0,10" Style="{StaticResource SectionTitleTextStyle}" />
+                    <ItemsControl ItemsSource="{Binding GuideRoleOptions}">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <ToggleButton Style="{StaticResource GuideRoleChipStyle}" IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                        IsEnabled="{Binding CanToggle}" ToolTip="{Binding StatusTooltip}"
+                                        AutomationProperties.Name="{Binding Label}" AutomationProperties.HelpText="{Binding StatusTooltip}">
+                            <StackPanel Orientation="Horizontal">
+                              <Ellipse Style="{StaticResource GuideRoleIndicatorStyle}" />
+                              <TextBlock Text="{Binding Label}" FontSize="13" FontWeight="SemiBold" />
+                            </StackPanel>
+                          </ToggleButton>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding Text.GuideRolesHint}" Margin="0,6,0,0" Style="{StaticResource HelperTextStyle}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </Grid>
+            </Grid>
+          </Border>
+
+          <Border>
+            <Border.Style>
+              <Style TargetType="Border" BasedOn="{StaticResource PanelBorderStyle}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
                   <DataTrigger Binding="{Binding SelectedPage}" Value="HeroGrid">
                     <Setter Property="Visibility" Value="Visible" />
                   </DataTrigger>
@@ -437,9 +604,25 @@
                             <TextBlock Text="{Binding HeroCountText}"
                                        Margin="0,8,0,0"
                                        Style="{StaticResource FieldLabelTextStyle}" />
-                            <TextBlock Text="{Binding HeroPreviewText}"
-                                       Margin="0,10,0,0"
-                                       Style="{StaticResource HelperTextStyle}" />
+                            <ItemsControl ItemsSource="{Binding Heroes}" Margin="0,10,0,0">
+                              <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                              </ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                  <Border Width="38" Height="38" Margin="0,0,5,5" CornerRadius="8"
+                                          Background="#303030" BorderBrush="#3C3C3C" BorderThickness="1"
+                                          ToolTip="{Binding Name}" Focusable="True"
+                                          AutomationProperties.Name="{Binding Name}">
+                                    <Grid>
+                                      <TextBlock Text="{Binding Fallback}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                 Foreground="#BABABA" FontSize="10" />
+                                      <Image Source="{Binding IconUrl}" Stretch="Uniform" ImageFailed="HeroImageFailed" />
+                                    </Grid>
+                                  </Border>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                           </StackPanel>
                         </Border>
                       </DataTemplate>

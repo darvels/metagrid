@@ -9,6 +9,8 @@ public sealed class HeroDefinition
     public required string LocalizedName { get; init; }
     public required string InternalName { get; init; }
     public required string Slug { get; init; }
+    public string? PortraitPath { get; init; }
+    public string? IconPath { get; init; }
 }
 
 public sealed class HeroGridCategory

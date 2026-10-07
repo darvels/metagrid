@@ -1,5 +1,10 @@
 <Project>
   <PropertyGroup>
+    <Version>0.2.0</Version>
+    <FileVersion>0.2.0.0</FileVersion>
+    <AssemblyVersion>0.2.0.0</AssemblyVersion>
+    <InformationalVersion>0.2.0</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

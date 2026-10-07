@@ -16,6 +16,7 @@ public enum AppPage
 {
     Dashboard,
     HeroGrid,
+    Guides,
     Accounts,
     UpdateHistory,
     Settings,
@@ -53,8 +54,17 @@ public sealed class MainViewModel : ObservableObject
     private readonly IPersonalizationService _personalizationService;
     private readonly IPersonalHeroCacheService _personalHeroCacheService;
     private readonly IPersonalizedGridComposer _personalizedGridComposer;
+    private readonly IGuideSubscriptionService _guideSubscriptionService;
     private readonly UiTextService _text;
     private readonly CancellationTokenSource _lifetimeCts = new();
+    private Task _startupGuideSyncTask = Task.CompletedTask;
+    private readonly SemaphoreSlim _guideUiSyncGate = new(1, 1);
+    private readonly HashSet<string> _busyGuideKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _pendingGuideToggleKeys = new(StringComparer.OrdinalIgnoreCase);
+    private bool _isGuidePickerOpen;
+    private GuideHeroCardViewModel? _guidePickerHighlightedHero;
+    private IReadOnlyDictionary<int, HeroDefinition> _heroDefinitionsById = new Dictionary<int, HeroDefinition>();
+    private double _guideCatalogItemWidth = 240;
     private HeroGridSnapshot? _availableInstallSnapshot;
     private AppSettings _settings = new();
     private AppSettings _editableSettings = new();
@@ -95,8 +105,11 @@ public sealed class MainViewModel : ObservableObject
     private string _personalizationDetailsText = "OpenDota automatically uses your selected Steam account to add MY BEST HEROES to the All Roles layout.";
     private string _personalizationConnectedAccountText = "No OpenDota account resolved yet";
     private string _personalizationLastRefreshText = "Never";
+    private string _guidesSearchText = string.Empty;
+    private GuideHeroCardViewModel? _selectedGuideHero;
     private HeroGridLayoutPreview? _selectedGridPreviewLayout;
     private IReadOnlyDictionary<int, string>? _heroNamesById;
+    private IReadOnlyList<GuideHeroCardViewModel> _allGuideHeroes = [];
     private bool _steamAutoDetectionStarted;
     private CancellationTokenSource? _scheduleCts;
     private Task? _schedulerTask;
@@ -138,6 +151,7 @@ public sealed class MainViewModel : ObservableObject
         IPersonalizationService personalizationService,
         IPersonalHeroCacheService personalHeroCacheService,
         IPersonalizedGridComposer personalizedGridComposer,
+        IGuideSubscriptionService guideSubscriptionService,
         UiTextService text)
     {
         _settingsService = settingsService;
@@ -159,6 +173,7 @@ public sealed class MainViewModel : ObservableObject
         _personalizationService = personalizationService;
         _personalHeroCacheService = personalHeroCacheService;
         _personalizedGridComposer = personalizedGridComposer;
+        _guideSubscriptionService = guideSubscriptionService;
         _text = text;
         _currentAppVersionText = appRuntimeInfo.GetCurrentVersion();
 
@@ -166,6 +181,9 @@ public sealed class MainViewModel : ObservableObject
         History = [];
         GridPreviewLayouts = [];
         PersonalHeroPreviewItems = [];
+        GuideHeroes = [];
+        MyGuideHeroes = [];
+        GuideRoleOptions = [];
         Text = text;
         Presets = Enum.GetValues<HeroGridPreset>();
         LanguageOptions =
@@ -213,6 +231,33 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<UpdateHistoryEntry> History { get; }
     public ObservableCollection<HeroGridLayoutPreview> GridPreviewLayouts { get; }
     public ObservableCollection<PersonalHeroPreviewItem> PersonalHeroPreviewItems { get; }
+    public ObservableCollection<GuideHeroCardViewModel> GuideHeroes { get; }
+    public ObservableCollection<GuideRoleOptionViewModel> GuideRoleOptions { get; }
+    public ObservableCollection<GuideHeroCardViewModel> MyGuideHeroes { get; }
+    public bool HasMyGuides => MyGuideHeroes.Count > 0;
+    public bool HasPickerResults => GuideHeroes.Count > 0;
+    public bool IsGuidePickerOpen
+    {
+        get => _isGuidePickerOpen;
+        set => SetProperty(ref _isGuidePickerOpen, value);
+    }
+    public GuideHeroCardViewModel? GuidePickerHighlightedHero
+    {
+        get => _guidePickerHighlightedHero;
+        set => SetProperty(ref _guidePickerHighlightedHero, value);
+    }
+    public void SelectPickerHero()
+    {
+        if (GuidePickerHighlightedHero is not { } hero) return;
+        HandleGuideHeroSelected(hero);
+        GuidesSearchText = string.Empty;
+        IsGuidePickerOpen = false;
+    }
+    public double GuideCatalogItemWidth
+    {
+        get => _guideCatalogItemWidth;
+        set => SetProperty(ref _guideCatalogItemWidth, value);
+    }
     public Array Presets { get; }
     public UiTextService Text { get; }
     public IReadOnlyList<LanguageOption> LanguageOptions { get; }
@@ -521,6 +566,37 @@ public sealed class MainViewModel : ObservableObject
         set => SetProperty(ref _personalizationLastRefreshText, value);
     }
 
+    public string GuidesSearchText
+    {
+        get => _guidesSearchText;
+        set
+        {
+            if (SetProperty(ref _guidesSearchText, value))
+            {
+                ApplyGuideFilter();
+                if (!string.IsNullOrWhiteSpace(value)) IsGuidePickerOpen = true;
+            }
+        }
+    }
+
+    public GuideHeroCardViewModel? SelectedGuideHero
+    {
+        get => _selectedGuideHero;
+        private set
+        {
+            if (SetProperty(ref _selectedGuideHero, value))
+            {
+                RaisePropertyChanged(nameof(HasGuideSelection));
+                RaisePropertyChanged(nameof(SelectedGuideName));
+                RaisePropertyChanged(nameof(SelectedGuideInternalName));
+                RaisePropertyChanged(nameof(SelectedGuidePortraitUrl));
+                RaisePropertyChanged(nameof(SelectedGuideRoleSummary));
+                RaisePropertyChanged(nameof(SelectedGuideSubscriptionSummary));
+                RefreshGuideRoleOptions();
+            }
+        }
+    }
+
     public LanguageOption? SelectedLanguageOption
     {
         get => _selectedLanguageOption;
@@ -668,6 +744,18 @@ public sealed class MainViewModel : ObservableObject
     public string LaterLabel => _text.T("Later", "ÐŸÐ¾Ð·Ð¶Ðµ");
 
     public bool HasPersonalHeroPreview => PersonalHeroPreviewItems.Count > 0;
+    public bool HasGuideSelection => SelectedGuideHero is not null;
+    public string SelectedGuideName => SelectedGuideHero?.Hero.LocalizedName ?? "Select a hero";
+    public string SelectedGuideInternalName => SelectedGuideHero?.Hero.InternalName ?? "Choose a hero from the catalog to configure Auto Guides.";
+    public string? SelectedGuidePortraitUrl => SelectedGuideHero?.PortraitUrl;
+    public string SelectedGuideRoleSummary => SelectedGuideHero is null
+        ? "Each role is subscribed independently. Enabling Carry does not automatically enable Mid or Support."
+        : $"Configure MetaGrid Auto Guides for {SelectedGuideHero.Hero.LocalizedName}. Each role is tracked independently and stored as its own subscription.";
+    public string SelectedGuideSubscriptionSummary => SelectedGuideHero is null
+        ? "No hero selected yet."
+        : SelectedGuideHero.ActiveRoleCount == 0
+            ? "No Auto Guide roles are enabled for this hero yet."
+            : $"{SelectedGuideHero.ActiveRoleCount} Auto Guide role(s) enabled for this hero.";
 
     public async Task InitializeAsync()
     {
@@ -680,11 +768,13 @@ public sealed class MainViewModel : ObservableObject
         await TryLoadSettingsAsync();
         await TryRefreshAccountsAsync();
         await TryLoadHistoryAsync();
+        await TryLoadGuideCatalogAsync();
         ApplySettingsToUi();
         await TryStartAutomaticUpdatesAsync();
         await TryStartAppUpdateChecksAsync();
 
         IsInitializing = false;
+        _startupGuideSyncTask = SyncEnabledGuidesAtStartupAsync();
 
         if (string.IsNullOrWhiteSpace(InitializationWarning))
         {
@@ -697,8 +787,42 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private async Task SyncEnabledGuidesAtStartupAsync()
+    {
+        await Task.Yield();
+        try
+        {
+            await MetaGrid.Core.Services.GuideStartupSync.RunAsync(_settings.GuideSubscriptions, async (heroId, role, token) =>
+            {
+                await _loggingService.LogAsync(LogLevelKind.Information, "Startup Auto Guide check started.", new { heroId, role }, token);
+                var hero = _allGuideHeroes.FirstOrDefault(item => item.Hero.Id == heroId)?.Hero;
+                if (hero is not null)
+                {
+                    try { await SyncGuideRoleSubscriptionAsync(hero, role, token); }
+                    catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                    {
+                        await _loggingService.LogAsync(LogLevelKind.Warning, "Startup Auto Guide check timed out.", new { heroId, role }, CancellationToken.None);
+                    }
+                }
+                else
+                    await _loggingService.LogAsync(LogLevelKind.Warning, "Enabled guide hero is absent from the catalog.", new { heroId, role }, token);
+            }, _lifetimeCts.Token);
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            await _loggingService.LogAsync(LogLevelKind.Warning, "Startup guide sync failed.", new { ex.Message }, CancellationToken.None);
+        }
+    }
+
     public async Task ShutdownAsync()
     {
+        _lifetimeCts.Cancel();
+        try { await _startupGuideSyncTask.WaitAsync(TimeSpan.FromSeconds(5)); }
+        catch (TimeoutException)
+        {
+            await _loggingService.LogAsync(LogLevelKind.Warning, "Startup guide sync exceeded shutdown grace period.", null, CancellationToken.None);
+        }
         await StopSchedulerAsync();
         await StopAppUpdateSchedulerAsync();
 
@@ -781,6 +905,26 @@ public sealed class MainViewModel : ObservableObject
         }
     }
 
+    private async Task TryLoadGuideCatalogAsync()
+    {
+        try
+        {
+            var heroes = await _heroCatalogService.LoadAllAsync(_lifetimeCts.Token);
+            _allGuideHeroes = heroes
+                .Select(hero => new GuideHeroCardViewModel(hero, HandleGuideHeroSelected))
+                .ToList();
+            ApplyGuideFilter();
+            RestoreGuideSelection();
+        }
+        catch (Exception ex)
+        {
+            InitializationWarning = string.IsNullOrWhiteSpace(InitializationWarning)
+                ? "The Guides catalog could not be loaded."
+                : InitializationWarning;
+            await _loggingService.LogAsync(LogLevelKind.Warning, "Guide catalog loading failed during startup.", new { ex.Message }, _lifetimeCts.Token);
+        }
+    }
+
     private void ApplySettingsToUi()
     {
         _text.Language = _settings.Language;
@@ -820,6 +964,7 @@ public sealed class MainViewModel : ObservableObject
 
         _ = TryApplyCachedPreviewAsync();
         _ = TryLoadPersonalHeroPreviewAsync();
+        SyncGuideSubscriptionStateFromSettings();
 
         OnboardingVisible = !_settings.OnboardingCompleted;
         UpdateSelectedAccountUi();
@@ -834,6 +979,327 @@ public sealed class MainViewModel : ObservableObject
         }, _lifetimeCts.Token);
         RaiseInstallActionState();
     }
+
+    private void ApplyGuideFilter()
+    {
+        var filtered = _allGuideHeroes.Where(hero => GuideWorkspace.Matches(hero.Hero, GuidesSearchText)).ToList();
+
+        GuideHeroes.Clear();
+        foreach (var hero in filtered)
+        {
+            GuideHeroes.Add(hero);
+        }
+
+        GuidePickerHighlightedHero = GuideHeroes.FirstOrDefault();
+        RaisePropertyChanged(nameof(HasPickerResults));
+    }
+
+    private void RestoreGuideSelection()
+    {
+        var preferredHeroId = _settings.GuideSubscriptions.FirstOrDefault(subscription => subscription.IsEnabled || subscription.NeedsRemoval)?.HeroId;
+        SelectedGuideHero = preferredHeroId.HasValue
+            ? _allGuideHeroes.FirstOrDefault(hero => hero.Hero.Id == preferredHeroId.Value)
+            : null;
+        UpdateGuideSelectionFlags();
+    }
+
+    private void SyncGuideSubscriptionStateFromSettings()
+    {
+        var activeKeys = _settings.GuideSubscriptions
+            .Where(subscription => subscription.IsEnabled)
+            .Select(subscription => subscription.StableKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var hero in _allGuideHeroes)
+        {
+            hero.ActiveRoleCount = Enum.GetValues<GuideRole>()
+                .Count(role => activeKeys.Contains(GuideSubscriptionRecord.CreateStableKey(hero.Hero.Id, role)));
+        }
+
+        MyGuideHeroes.Clear();
+        foreach (var group in GuideWorkspace.ConfiguredHeroes(_settings.GuideSubscriptions))
+        {
+            var hero = _allGuideHeroes.FirstOrDefault(item => item.Hero.Id == group.Key);
+            if (hero is null)
+            {
+                var record = group.First();
+                hero = new GuideHeroCardViewModel(new HeroDefinition { Id = group.Key, LocalizedName = record.HeroDisplayName,
+                    InternalName = record.HeroInternalName, Slug = record.HeroInternalName }, HandleGuideHeroSelected);
+            }
+            hero.Roles = group.Select(record => new GuideRoleBadge(ToGuideRoleLabel(record.Role),
+                GuideStatusPresentation.Tone(record.IsEnabled, record.Status),
+                $"{ToGuideRoleLabel(record.Role)}: {GuideStatusPresentation.Label(_text, record.IsEnabled, record.Status)}")).ToArray();
+            MyGuideHeroes.Add(hero);
+        }
+        RaisePropertyChanged(nameof(HasMyGuides));
+        RefreshGuideRoleOptions();
+        RaisePropertyChanged(nameof(SelectedGuideSubscriptionSummary));
+    }
+
+    private void HandleGuideHeroSelected(GuideHeroCardViewModel hero)
+    {
+        SelectedGuideHero = hero;
+        UpdateGuideSelectionFlags();
+    }
+
+    private void UpdateGuideSelectionFlags()
+    {
+        foreach (var hero in _allGuideHeroes)
+        {
+            hero.IsSelected = ReferenceEquals(hero, SelectedGuideHero);
+        }
+    }
+
+    private void RefreshGuideRoleOptions()
+    {
+        GuideRoleOptions.Clear();
+        if (SelectedGuideHero is null)
+        {
+            return;
+        }
+
+        var hero = SelectedGuideHero.Hero;
+        foreach (var role in Enum.GetValues<GuideRole>())
+        {
+            var existing = _settings.GuideSubscriptions.FirstOrDefault(subscription =>
+                subscription.HeroId == SelectedGuideHero.Hero.Id &&
+                subscription.Role == role);
+
+            var option = new GuideRoleOptionViewModel(
+                role,
+                ToGuideRoleLabel(role),
+                existing?.IsEnabled ?? false,
+                isEnabled => SetGuideRoleSubscriptionSafelyAsync(hero, role, isEnabled),
+                () => SyncGuideRoleSubscriptionAsync(hero, role));
+            ApplyGuideRoleOptionState(option, existing);
+            GuideRoleOptions.Add(option);
+        }
+    }
+
+    private async Task SetGuideRoleSubscriptionSafelyAsync(HeroDefinition hero, GuideRole role, bool enabled)
+    {
+        var key = GuideSubscriptionRecord.CreateStableKey(hero.Id, role);
+        if (!_pendingGuideToggleKeys.Add(key)) { RefreshGuideRoleOptions(); return; }
+        RefreshGuideRoleOptions();
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts.Token);
+        cts.CancelAfter(TimeSpan.FromSeconds(90));
+        var acquired = false;
+        try
+        {
+            await _guideUiSyncGate.WaitAsync(cts.Token);
+            acquired = true;
+            await SetGuideRoleSubscriptionAsync(hero, role, enabled, cts.Token);
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            var record = _settings.GuideSubscriptions.FirstOrDefault(item => item.StableKey == key);
+            if (record is not null)
+            {
+                record.Status = record.NeedsRemoval ? GuideSubscriptionStatus.RemovalPending : GuideSubscriptionStatus.Error;
+                record.LastError = record.StatusMessage = ex.Message;
+                await PersistSettingsAsync(CancellationToken.None);
+            }
+            await _loggingService.LogAsync(LogLevelKind.Warning, "Guide subscription toggle failed.", new { hero.Id, role, ex.Message }, CancellationToken.None);
+        }
+        finally
+        {
+            if (acquired) _guideUiSyncGate.Release();
+            _pendingGuideToggleKeys.Remove(key);
+            SyncGuideSubscriptionStateFromSettings();
+        }
+    }
+
+    private async Task SetGuideRoleSubscriptionAsync(HeroDefinition hero, GuideRole role, bool isEnabled, CancellationToken token)
+    {
+        var existing = _settings.GuideSubscriptions.FirstOrDefault(subscription =>
+            subscription.HeroId == hero.Id &&
+            subscription.Role == role);
+
+        if (existing is null)
+        {
+            existing = new GuideSubscriptionRecord
+            {
+                HeroId = hero.Id,
+                HeroInternalName = hero.InternalName,
+                HeroDisplayName = hero.LocalizedName,
+                Role = role
+            };
+            _settings.GuideSubscriptions.Add(existing);
+        }
+
+        existing.IsEnabled = isEnabled;
+        existing.RemovalRequested = !isEnabled;
+        existing.LastError = null;
+        existing.HeroInternalName = hero.InternalName;
+        existing.HeroDisplayName = hero.LocalizedName;
+        existing.Status = isEnabled ? GuideSubscriptionStatus.Pending : GuideSubscriptionStatus.RemovalPending;
+        existing.StatusMessage = isEnabled
+            ? "Auto Guide is enabled and ready to sync."
+            : "Owned guide removal is pending.";
+        _settings.GuideSubscriptions = GuideSubscriptionCollection.Normalize(_settings.GuideSubscriptions);
+        SyncGuideSubscriptionStateFromSettings();
+        RaisePropertyChanged(nameof(Settings));
+        await PersistSettingsAsync(token);
+        await _loggingService.LogAsync(LogLevelKind.Information, "Auto Guide role intent persisted.",
+            new { hero.Id, role, Enabled = isEnabled, RemovalRequested = !isEnabled }, token);
+        await SyncGuideRoleCoreAsync(hero, role, token);
+    }
+
+    private async Task SyncGuideRoleSubscriptionAsync(HeroDefinition hero, GuideRole role, CancellationToken cancellationToken = default)
+    {
+        using var syncCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts.Token, cancellationToken);
+        syncCts.CancelAfter(TimeSpan.FromSeconds(90));
+        await _guideUiSyncGate.WaitAsync(syncCts.Token);
+        var key = GuideSubscriptionRecord.CreateStableKey(hero.Id, role);
+        _busyGuideKeys.Add(key);
+        RefreshGuideRoleOptions();
+        try { await SyncGuideRoleCoreAsync(hero, role, syncCts.Token); }
+        finally
+        {
+            _busyGuideKeys.Remove(key);
+            RefreshGuideRoleOptions();
+            _guideUiSyncGate.Release();
+        }
+    }
+
+    private async Task SyncGuideRoleCoreAsync(HeroDefinition hero, GuideRole role, CancellationToken token)
+    {
+        var subscription = _settings.GuideSubscriptions.FirstOrDefault(record =>
+            record.HeroId == hero.Id &&
+            record.Role == role);
+        var option = SelectedGuideHero?.Hero.Id == hero.Id
+            ? GuideRoleOptions.FirstOrDefault(item => item.Role == role) : null;
+        if (subscription is null || (!subscription.IsEnabled && !subscription.NeedsRemoval))
+        {
+            return;
+        }
+
+        if (SelectedAccount?.Model is not { } account)
+        {
+            subscription.Status = subscription.NeedsRemoval ? GuideSubscriptionStatus.RemovalPending : GuideSubscriptionStatus.Pending;
+            subscription.StatusMessage = "Select a Dota account before syncing this Auto Guide.";
+            subscription.LastError = null;
+            if (option is not null) ApplyGuideRoleOptionState(option, subscription);
+            SyncGuideSubscriptionStateFromSettings();
+            await PersistSettingsAsync(token);
+            return;
+        }
+
+        if (subscription.NeedsRemoval)
+        {
+            subscription.Status = GuideSubscriptionStatus.Removing;
+            SyncGuideSubscriptionStateFromSettings();
+            try
+            {
+                var result = await _guideSubscriptionService.RemoveAsync(account, subscription, token);
+                subscription = _settings.GuideSubscriptions.First(record => record.HeroId == hero.Id && record.Role == role);
+                if (!subscription.ApplyVerifiedRemoval(result))
+                {
+                    subscription.IsEnabled = false;
+                    subscription.RemovalRequested = true;
+                    subscription.RemoteFile = result.RemoteFile ?? subscription.RemoteFile;
+                    subscription.Status = result.Status;
+                    subscription.LastError = subscription.StatusMessage = result.Message;
+                }
+                await PersistSettingsAsync(CancellationToken.None);
+            }
+            catch (OperationCanceledException)
+            {
+                subscription = _settings.GuideSubscriptions.First(record => record.HeroId == hero.Id && record.Role == role);
+                subscription.Status = GuideSubscriptionStatus.RemovalPending;
+                subscription.StatusMessage = "Removal interrupted; ownership data retained for retry.";
+                await PersistSettingsAsync(CancellationToken.None);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                subscription = _settings.GuideSubscriptions.First(record => record.HeroId == hero.Id && record.Role == role);
+                subscription.Status = GuideSubscriptionStatus.RemovalFailed;
+                subscription.LastError = subscription.StatusMessage = ex.Message;
+                await PersistSettingsAsync(CancellationToken.None);
+                await _loggingService.LogAsync(LogLevelKind.Error, "Auto Guide removal failed; ownership metadata retained.", new { hero.Id, role, Error = ex.ToString() }, CancellationToken.None);
+            }
+            finally { SyncGuideSubscriptionStateFromSettings(); }
+            return;
+        }
+
+        if (option is not null) option.IsBusy = true;
+        subscription.Status = GuideSubscriptionStatus.Installing;
+        subscription.StatusMessage = "Syncing Auto Guide through Steam RemoteStorage.";
+        if (option is not null) ApplyGuideRoleOptionState(option, subscription);
+        SyncGuideSubscriptionStateFromSettings();
+
+        try
+        {
+            var result = await _guideSubscriptionService.SyncAsync(account, subscription, token);
+            subscription = _settings.GuideSubscriptions.First(record => record.HeroId == hero.Id && record.Role == role);
+            subscription.ProviderName = result.ProviderName ?? subscription.ProviderName;
+            subscription.SourceStrategy = result.SourceStrategy ?? subscription.SourceStrategy;
+            subscription.BuildTitle = result.BuildTitle ?? subscription.BuildTitle;
+            subscription.PatchLabel = result.PatchLabel ?? subscription.PatchLabel;
+            subscription.AvailableHash = result.CanonicalSourceHash ?? subscription.AvailableHash;
+            if (subscription.ApplyVerifiedInstallation(result)) subscription.InstalledAccountId = account.AccountId;
+            subscription.LastCheckedAt = DateTimeOffset.UtcNow;
+            subscription.LastRetrievedAt = result.RetrievedAtUtc ?? subscription.LastRetrievedAt;
+            subscription.Status = result.Status;
+            subscription.StatusMessage = result.Message;
+            subscription.LastError = result.Status is GuideSubscriptionStatus.Error or GuideSubscriptionStatus.MappingFailed or GuideSubscriptionStatus.SourceIncomplete or GuideSubscriptionStatus.SourcePatchIncompatible or GuideSubscriptionStatus.Conflict or GuideSubscriptionStatus.SourceUnavailable or GuideSubscriptionStatus.SteamUnavailable
+                ? result.Message
+                : null;
+
+
+            if (option is not null) ApplyGuideRoleOptionState(option, subscription);
+            SyncGuideSubscriptionStateFromSettings();
+            await PersistSettingsAsync(token);
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            subscription = _settings.GuideSubscriptions.First(record => record.HeroId == hero.Id && record.Role == role);
+            subscription.Status = GuideSubscriptionStatus.Error;
+            subscription.StatusMessage = ex.Message;
+            subscription.LastError = ex.Message;
+            if (option is not null) ApplyGuideRoleOptionState(option, subscription);
+            SyncGuideSubscriptionStateFromSettings();
+            await _loggingService.LogAsync(LogLevelKind.Warning, "Guide subscription sync failed from the UI workflow.", new
+            {
+                hero.Id,
+                role,
+                ex.Message
+            }, CancellationToken.None);
+            await PersistSettingsAsync(CancellationToken.None);
+        }
+        finally
+        {
+            if (option is not null) option.IsBusy = false;
+            if (option is not null) ApplyGuideRoleOptionState(option, subscription);
+            SyncGuideSubscriptionStateFromSettings();
+        }
+    }
+
+    private void ApplyGuideRoleOptionState(GuideRoleOptionViewModel option, GuideSubscriptionRecord? subscription)
+    {
+        var enabled = subscription?.IsEnabled == true;
+        var status = subscription?.Status ?? GuideSubscriptionStatus.Disabled;
+        var key = SelectedGuideHero is null ? string.Empty : GuideSubscriptionRecord.CreateStableKey(SelectedGuideHero.Hero.Id, option.Role);
+        option.IsBusy = _busyGuideKeys.Contains(key) || _pendingGuideToggleKeys.Contains(key);
+        option.StatusChip = GuideStatusPresentation.Label(_text, enabled, status);
+        option.StatusTone = GuideStatusPresentation.Tone(enabled, status, option.IsBusy);
+        option.StatusDetail = subscription?.StatusMessage ?? option.StatusChip;
+        option.HashDetail = subscription?.EffectiveGuideHash ?? string.Empty;
+    }
+
+    private string ToGuideRoleLabel(GuideRole role)
+        => role switch
+        {
+            GuideRole.Carry => _text.T("Carry", "Керри"),
+            GuideRole.Mid => _text.T("Mid", "Мид"),
+            GuideRole.Offlane => _text.T("Offlane", "Оффлейн"),
+            GuideRole.Support => _text.T("Support", "Саппорт"),
+            GuideRole.HardSupport => _text.T("Hard Support", "Саппорт 5"),
+            _ => role.ToString()
+        };
 
     private async Task<bool> TryHydrateProviderMetadataFromCacheAsync()
     {
@@ -2189,6 +2655,7 @@ public sealed class MainViewModel : ObservableObject
 
     private void RefreshLocalizedBindings()
     {
+        SyncGuideSubscriptionStateFromSettings();
         UpdateIntervalOptions =
         [
             new UpdateIntervalOption(UpdateInterval.FifteenMinutes, FormatInterval(UpdateInterval.FifteenMinutes)),
@@ -2767,6 +3234,7 @@ public sealed class MainViewModel : ObservableObject
 
         var existingSelection = SelectedGridPreviewLayout?.Name;
         var heroNamesById = await EnsureHeroNamesByIdAsync();
+        var iconCatalog = _heroDefinitionsById;
         var layouts = snapshot.Layouts
             .Select(layout => new HeroGridLayoutPreview(
                 layout.Name,
@@ -2776,7 +3244,8 @@ public sealed class MainViewModel : ObservableObject
                         index,
                         category.Name,
                         category.HeroIds.Count,
-                        BuildHeroPreviewText(category.HeroIds, heroNamesById)))
+                        BuildHeroPreviewText(category.HeroIds, heroNamesById),
+                        category.HeroIds.Select(id => HeroIconPresentation.Create(id, iconCatalog)).ToArray()))
                     .ToArray()))
             .ToArray();
 
@@ -2804,6 +3273,8 @@ public sealed class MainViewModel : ObservableObject
         try
         {
             var heroesByName = await _heroCatalogService.LoadByNameAsync(_lifetimeCts.Token);
+            _heroDefinitionsById = heroesByName.Values.GroupBy(hero => hero.Id)
+                .ToDictionary(group => group.Key, group => group.First());
             _heroNamesById = heroesByName.Values
                 .GroupBy(hero => hero.Id)
                 .ToDictionary(group => group.Key, group => group.First().LocalizedName);
@@ -3291,13 +3762,14 @@ public sealed class HeroGridLayoutPreview
 
 public sealed class HeroGridCategoryPreview
 {
-    public HeroGridCategoryPreview(string stableId, int order, string name, int heroCount, string heroPreviewText)
+    public HeroGridCategoryPreview(string stableId, int order, string name, int heroCount, string heroPreviewText, IReadOnlyList<HeroIconPresentation>? heroes = null)
     {
         StableId = stableId;
         Order = order;
         Name = name;
         HeroCount = heroCount;
         HeroPreviewText = heroPreviewText;
+        Heroes = heroes ?? [];
     }
 
     public string StableId { get; }
@@ -3305,6 +3777,7 @@ public sealed class HeroGridCategoryPreview
     public string Name { get; }
     public int HeroCount { get; }
     public string HeroPreviewText { get; }
+    public IReadOnlyList<HeroIconPresentation> Heroes { get; }
     public string HeroCountText => $"{HeroCount} {(HeroCount == 1 ? "hero" : "heroes")}";
 }
 

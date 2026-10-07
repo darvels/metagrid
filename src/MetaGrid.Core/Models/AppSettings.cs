@@ -49,6 +49,7 @@ public sealed class AppSettings : INotifyPropertyChanged
     private string? _lastAppUpdateMessage;
     private string? _deferredAppUpdateVersion;
     private DateTimeOffset? _deferredAppUpdateUntil;
+    private List<GuideSubscriptionRecord> _guideSubscriptions = [];
     private bool _hasSeenCloseToTrayNotification;
     private AppLanguage _language = AppLanguage.English;
 
@@ -318,6 +319,12 @@ public sealed class AppSettings : INotifyPropertyChanged
         set => SetProperty(ref _deferredAppUpdateUntil, value);
     }
 
+    public List<GuideSubscriptionRecord> GuideSubscriptions
+    {
+        get => _guideSubscriptions;
+        set => SetProperty(ref _guideSubscriptions, value ?? []);
+    }
+
     public bool HasSeenCloseToTrayNotification
     {
         get => _hasSeenCloseToTrayNotification;
@@ -376,6 +383,7 @@ public sealed class AppSettings : INotifyPropertyChanged
         LastAppUpdateMessage = LastAppUpdateMessage,
         DeferredAppUpdateVersion = DeferredAppUpdateVersion,
         DeferredAppUpdateUntil = DeferredAppUpdateUntil,
+        GuideSubscriptions = GuideSubscriptions.Select(subscription => subscription.CreateCopy()).ToList(),
         HasSeenCloseToTrayNotification = HasSeenCloseToTrayNotification,
         Language = Language
     };
@@ -426,6 +434,7 @@ public sealed class AppSettings : INotifyPropertyChanged
         LastAppUpdateMessage = other.LastAppUpdateMessage;
         DeferredAppUpdateVersion = other.DeferredAppUpdateVersion;
         DeferredAppUpdateUntil = other.DeferredAppUpdateUntil;
+        GuideSubscriptions = other.GuideSubscriptions.Select(subscription => subscription.CreateCopy()).ToList();
         HasSeenCloseToTrayNotification = other.HasSeenCloseToTrayNotification;
         Language = other.Language;
     }

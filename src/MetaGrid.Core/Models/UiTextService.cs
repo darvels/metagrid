@@ -28,6 +28,16 @@ public sealed class UiTextService : INotifyPropertyChanged
     public string AppSubtitle => T("Dota 2 Hero Grid Updater", "Обновление сетки героев Dota 2");
     public string Dashboard => T("Dashboard", "Главная");
     public string HeroGrid => T("Hero Grid", "Сетка героев");
+    public string Guides => T("Guides", "Гайды");
+    public string GuidesDescription => T("Choose a hero and enable the roles you want to keep updated.", "Выберите героя и включите роли для автоматического обновления гайдов.");
+    public string GuideCatalog => T("Hero catalog", "Каталог героев");
+    public string GuideRoles => T("Auto Guide roles", "Роли автогайдов");
+    public string GuideRolesHint => T("Enabled roles sync automatically. Turning a role off removes only its MetaGrid-owned guide.", "Включённые роли обновляются автоматически. Отключение удаляет только собственный гайд MetaGrid этой роли.");
+    public string MyAutoGuides => T("My Auto Guides", "Мои автогайды");
+    public string AddGuideHero => T("Add Hero", "Добавить героя");
+    public string SearchGuideHero => T("Search hero", "Найти героя");
+    public string NoAutoGuides => T("No Auto Guides yet. Use Add Hero to choose a hero and enable a role.", "Автогайдов пока нет. Добавьте героя и включите нужную роль.");
+    public string NoGuideHeroMatches => T("No heroes match your search.", "Герои не найдены.");
     public string Accounts => T("Accounts", "Аккаунты");
     public string UpdateHistory => T("Update History", "История обновлений");
     public string Settings => T("Settings", "Настройки");

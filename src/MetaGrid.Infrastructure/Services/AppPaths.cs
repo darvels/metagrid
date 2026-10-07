@@ -18,6 +18,7 @@ public sealed class AppPaths : IAppPaths
         D2ptCacheDirectory = Path.Combine(CacheDirectory, "D2PT");
         D2ptTempDirectory = Path.Combine(D2ptCacheDirectory, "Temp");
         D2ptWebView2ProfileDirectory = Path.Combine(RootDirectory, "WebView2", "D2PT");
+        GuideCacheDirectory = Path.Combine(CacheDirectory, "Guides");
         AppUpdateDirectory = Path.Combine(RootDirectory, "AppUpdate");
         AppUpdateSessionDirectory = Path.Combine(AppUpdateDirectory, "Sessions");
 
@@ -30,6 +31,7 @@ public sealed class AppPaths : IAppPaths
         Directory.CreateDirectory(D2ptCacheDirectory);
         Directory.CreateDirectory(D2ptTempDirectory);
         Directory.CreateDirectory(D2ptWebView2ProfileDirectory);
+        Directory.CreateDirectory(GuideCacheDirectory);
         Directory.CreateDirectory(AppUpdateDirectory);
         Directory.CreateDirectory(AppUpdateSessionDirectory);
     }
@@ -46,6 +48,7 @@ public sealed class AppPaths : IAppPaths
     public string D2ptCacheDirectory { get; }
     public string D2ptTempDirectory { get; }
     public string D2ptWebView2ProfileDirectory { get; }
+    public string GuideCacheDirectory { get; }
     public string AppUpdateDirectory { get; }
     public string AppUpdateSessionDirectory { get; }
 

@@ -253,6 +253,30 @@
     </Setter>
   </Style>
 
+  <Style x:Key="ContentCardButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="CardFocus" CornerRadius="18" BorderBrush="Transparent" BorderThickness="0">
+            <ContentPresenter ContentSource="Content" RecognizesAccessKey="False"
+                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="CardFocus" Property="BorderBrush" Value="{StaticResource FocusBorderBrush}" />
+              <Setter TargetName="CardFocus" Property="BorderThickness" Value="1" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="CardFocus" Property="Opacity" Value="0.6" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <Style x:Key="CompactActionButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
     <Setter Property="MinHeight" Value="38" />
     <Setter Property="Padding" Value="14,8" />
@@ -875,4 +899,104 @@
     <Setter Property="Background" Value="{StaticResource WindowBrush}" />
     <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}" />
   </Style>
+  <Style x:Key="GuideSearchTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+    <Setter Property="MinHeight" Value="36" />
+    <Setter Property="Padding" Value="10,7" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TextBox">
+          <Border x:Name="SearchChrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
+            <Grid>
+              <ScrollViewer x:Name="PART_ContentHost" Padding="0" Margin="0" VerticalAlignment="Center"
+                            HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
+              <TextBlock x:Name="SearchPlaceholder" Text="{TemplateBinding Tag}" Foreground="#858585"
+                         Margin="{TemplateBinding Padding}" VerticalAlignment="Center" IsHitTestVisible="False" Visibility="Collapsed" />
+            </Grid>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="Text" Value=""><Setter TargetName="SearchPlaceholder" Property="Visibility" Value="Visible" /></Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="SearchChrome" Property="BorderBrush" Value="{StaticResource FocusBorderBrush}" /></Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{StaticResource ComboBoxDisabledTextBrush}" /></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="GuidePickerToggleStyle" TargetType="ToggleButton">
+    <Setter Property="Background" Value="#282828" />
+    <Setter Property="Foreground" Value="#D8D8D8" />
+    <Setter Property="BorderBrush" Value="#444444" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ToggleButton">
+      <Border x:Name="Surface" CornerRadius="10" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}" />
+      </Border>
+      <ControlTemplate.Triggers>
+        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#373737" /></Trigger>
+        <Trigger Property="IsChecked" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#9A855A" /></Trigger>
+        <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="#CDAA62" /></Trigger>
+      </ControlTemplate.Triggers>
+    </ControlTemplate></Setter.Value></Setter>
+  </Style>
+
+  <Style x:Key="GuideRoleChipStyle" TargetType="ToggleButton">
+    <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+    <Setter Property="Background" Value="#252525" />
+    <Setter Property="Foreground" Value="#C6C6C6" />
+    <Setter Property="BorderBrush" Value="#3B3B3B" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="10,9" />
+    <Setter Property="Margin" Value="0,0,6,8" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ToggleButton">
+          <Border x:Name="Surface" CornerRadius="12"
+                  Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                              TextElement.Foreground="{TemplateBinding Foreground}" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter Property="Background" Value="#24352D" />
+              <Setter Property="Foreground" Value="#DCECE2" />
+              <Setter Property="BorderBrush" Value="#4A6858" />
+            </Trigger>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Surface" Property="BorderBrush" Value="#858585" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Surface" Property="Opacity" Value="0.8" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Surface" Property="BorderBrush" Value="#CDAA62" />
+              <Setter TargetName="Surface" Property="BorderThickness" Value="2" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Surface" Property="Opacity" Value="0.75" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="GuideRoleIndicatorStyle" TargetType="Ellipse">
+    <Setter Property="Width" Value="6" />
+    <Setter Property="Height" Value="6" />
+    <Setter Property="Margin" Value="0,0,5,0" />
+    <Setter Property="Fill" Value="#757575" />
+    <Style.Triggers>
+      <DataTrigger Binding="{Binding StatusTone}" Value="Success"><Setter Property="Fill" Value="#8CCDA5" /></DataTrigger>
+      <DataTrigger Binding="{Binding StatusTone}" Value="Busy"><Setter Property="Fill" Value="#B2C6DC" /></DataTrigger>
+      <DataTrigger Binding="{Binding StatusTone}" Value="Warning"><Setter Property="Fill" Value="#D0AE73" /></DataTrigger>
+    </Style.Triggers>
+  </Style>
+
 </ResourceDictionary>
